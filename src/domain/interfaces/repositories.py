@@ -1,0 +1,16 @@
+from typing import Protocol
+
+from src.domain.entities.users import UserEntity
+from src.use_cases.users.dto import CreateUserDTO, UpdateUserDTO
+
+
+class IUserRepository(Protocol):
+    async def create_user(self, user: CreateUserDTO) -> UserEntity: ...
+
+    async def update_user(self, user_id: int, user: UpdateUserDTO) -> UserEntity: ...
+
+    async def delete_user(self, user_id: int) -> None: ...
+
+    async def get_user_by_id(self, user_id: int) -> UserEntity: ...
+
+    async def get_user_by_email(self, email: str) -> UserEntity: ...
