@@ -5,6 +5,12 @@ from src.infrastructure.utilities.dto import BaseDTOMixin
 
 
 @dataclass
+class LoginUserDTO(BaseDTOMixin):
+    email: str
+    password: str
+
+
+@dataclass
 class CreateUserDTO(BaseDTOMixin):
     email: str
     password_hash: str

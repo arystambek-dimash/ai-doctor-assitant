@@ -3,7 +3,7 @@ from typing import Optional
 import sqlalchemy as sa
 import sqlalchemy.orm as orm
 
-from src.domain.model_mixins import IdMixin, TimeStampMixin
+from . import IdMixin, TimeStampMixin
 from ..core import Base
 
 
@@ -17,6 +17,9 @@ class User(Base, IdMixin, TimeStampMixin):
     is_admin: orm.Mapped[bool] = orm.mapped_column(sa.Boolean, default=False)
 
     doctor_profile = orm.relationship("Doctor", back_populates="user")
+    ai_consultations = orm.relationship("AIConsultation", back_populates="patient")
+    appointments_as_patient = orm.relationship("Appointment", back_populates="patient")
+    medical_records = orm.relationship("MedicalRecord", back_populates="patient")
 
     @property
     def is_doctor(self) -> bool:

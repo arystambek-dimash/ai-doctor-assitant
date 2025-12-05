@@ -5,7 +5,7 @@ import sqlalchemy as sa
 import sqlalchemy.orm as orm
 
 from src.domain.constants import AppointmentStatus
-from src.domain.model_mixins import IdMixin, TimeStampMixin
+from . import IdMixin, TimeStampMixin
 from ..core import Base
 
 
