@@ -1,6 +1,6 @@
 from src.domain.entities.users import UserEntity
 from src.domain.errors import BadRequestException, NotFoundException
-from src.domain.interfaces.repositories import IUserRepository
+from src.domain.interfaces.user_repository import IUserRepository
 from src.domain.interfaces.uow import IUoW
 from src.infrastructure.services.jwt_service import JWTService
 from src.infrastructure.services.password_service import PasswordService

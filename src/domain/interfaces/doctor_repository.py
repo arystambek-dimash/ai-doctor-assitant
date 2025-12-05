@@ -1,0 +1,61 @@
+from abc import ABC, abstractmethod
+from typing import Optional
+
+from src.domain.constants import DoctorStatus
+from src.domain.entities.doctors import DoctorEntity, DoctorWithDetailsEntity
+from src.use_cases.doctors.dto import CreateDoctorDTO, UpdateDoctorDTO, ApproveDoctorDTO
+
+
+class IDoctorRepository(ABC):
+    @abstractmethod
+    async def create_doctor(self, doctor: CreateDoctorDTO) -> DoctorEntity:
+        pass
+
+    @abstractmethod
+    async def update_doctor(self, doctor_id: int, doctor: UpdateDoctorDTO) -> DoctorEntity:
+        pass
+
+    @abstractmethod
+    async def update_doctor_status(self, doctor_id: int, dto: ApproveDoctorDTO) -> DoctorEntity:
+        pass
+
+    @abstractmethod
+    async def get_doctor_by_id(self, doctor_id: int) -> Optional[DoctorEntity]:
+        pass
+
+    @abstractmethod
+    async def get_doctor_by_user_id(self, user_id: int) -> Optional[DoctorEntity]:
+        pass
+
+    @abstractmethod
+    async def get_doctor_by_license_number(self, license_number: str) -> Optional[DoctorEntity]:
+        pass
+
+    @abstractmethod
+    async def get_doctor_with_details(self, doctor_id: int) -> Optional[DoctorWithDetailsEntity]:
+        pass
+
+    @abstractmethod
+    async def get_all_doctors(
+            self,
+            status: Optional[DoctorStatus] = None,
+            skip: int = 0,
+            limit: int = 10,
+    ) -> list[DoctorWithDetailsEntity]:
+        pass
+
+    @abstractmethod
+    async def get_doctors_by_specialization(
+            self,
+            specialization_id: int,
+            only_approved: bool = True,
+    ) -> list[DoctorWithDetailsEntity]:
+        pass
+
+    @abstractmethod
+    async def get_pending_doctors(self, skip: int = 0, limit: int = 20) -> list[DoctorWithDetailsEntity]:
+        pass
+
+    @abstractmethod
+    async def delete_doctor(self, doctor_id: int) -> bool:
+        pass

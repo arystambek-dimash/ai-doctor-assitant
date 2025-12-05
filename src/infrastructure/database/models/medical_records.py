@@ -1,4 +1,3 @@
-from datetime import datetime
 from typing import Optional
 
 import sqlalchemy as sa
@@ -8,14 +7,12 @@ from . import IdMixin, TimeStampMixin
 from ..core import Base
 
 
-class MedicalRecord(Base, IdMixin):
+class MedicalRecord(Base, IdMixin, TimeStampMixin):
     __tablename__ = "medical_records"
 
     diagnosis: orm.Mapped[str] = orm.mapped_column(sa.Text)
     prescription: orm.Mapped[Optional[str]] = orm.mapped_column(sa.Text, nullable=True)
     notes: orm.Mapped[Optional[str]] = orm.mapped_column(sa.Text, nullable=True)
-    created_at: orm.Mapped[datetime] = orm.mapped_column(sa.DateTime, default=datetime.utcnow)
-
     patient_id: orm.Mapped[int] = orm.mapped_column(
         sa.ForeignKey("users.id", ondelete="CASCADE")
     )

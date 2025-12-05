@@ -25,3 +25,4 @@ class AIConsultation(Base, IdMixin):
         "Appointment",
         back_populates="ai_consultation"
     )
+    messages = orm.relationship("ChatMessage", back_populates="consultation", order_by="ChatMessage.created_at")

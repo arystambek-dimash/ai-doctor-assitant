@@ -5,7 +5,7 @@ from src.presentation.api.schemas.requests.users import UserCreateRequest, UserL
 from src.presentation.api.schemas.responses.users import UserResponse, LoginResponse
 from src.presentation.dependencies import get_user_use_case, get_current_user
 from src.use_cases.users.dto import CreateUserDTO, LoginUserDTO
-from src.use_cases.users.users import UserUseCase
+from src.use_cases.users.use_case import UserUseCase
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
