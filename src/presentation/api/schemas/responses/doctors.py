@@ -45,7 +45,6 @@ class DoctorWithDetailsResponse(BaseModel):
 
 
 class DoctorPublicResponse(BaseModel):
-    """Public doctor info (no sensitive data)."""
     id: int
     bio: str
     rating: float

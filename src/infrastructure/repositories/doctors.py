@@ -1,3 +1,6 @@
+from abc import ABC
+from typing import Optional
+
 from sqlalchemy import insert, select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -6,10 +9,10 @@ from src.domain.constants import DoctorStatus
 from src.domain.entities.doctors import DoctorEntity, DoctorWithDetailsEntity
 from src.domain.interfaces.doctor_repository import IDoctorRepository
 from src.infrastructure.database.models.doctors import Doctor
-from src.use_cases.doctors.dto import CreateDoctorDTO, UpdateDoctorDTO, ApproveDoctorDTO
+from src.use_cases.doctors.dto import CreateDoctorDTO, UpdateDoctorDTO
 
 
-class DoctorRepository(IDoctorRepository):
+class DoctorRepository(IDoctorRepository, ABC):
     def __init__(self, session: AsyncSession):
         self._session = session
 
@@ -28,17 +31,6 @@ class DoctorRepository(IDoctorRepository):
             update(Doctor)
             .where(Doctor.id == doctor_id)
             .values(**doctor.to_payload(exclude_none=True))
-            .returning(Doctor)
-        )
-        result = await self._session.execute(stmt)
-        obj = result.scalar_one()
-        return self._from_orm(obj)
-
-    async def update_doctor_status(self, doctor_id: int, dto: ApproveDoctorDTO) -> DoctorEntity:
-        stmt = (
-            update(Doctor)
-            .where(Doctor.id == doctor_id)
-            .values(**dto.to_payload(exclude_none=True))
             .returning(Doctor)
         )
         result = await self._session.execute(stmt)
@@ -83,7 +75,8 @@ class DoctorRepository(IDoctorRepository):
 
     async def get_all_doctors(
             self,
-            status: DoctorStatus | None = None,
+            status: Optional[DoctorStatus] = None,
+            specialization_id: Optional[int] = None,
             skip: int = 0,
             limit: int = 10,
     ) -> list[DoctorWithDetailsEntity]:
@@ -91,43 +84,11 @@ class DoctorRepository(IDoctorRepository):
             select(Doctor)
             .options(joinedload(Doctor.user), joinedload(Doctor.specialization))
         )
-
         if status:
             stmt = stmt.where(Doctor.status == status)
-
+        if specialization_id:
+            stmt = stmt.where(Doctor.specialization_id == specialization_id)
         stmt = stmt.offset(skip).limit(limit)
-
-        result = await self._session.execute(stmt)
-        doctors = result.scalars().unique().all()
-        return [self._from_orm_with_details(d) for d in doctors]
-
-    async def get_doctors_by_specialization(
-            self,
-            specialization_id: int,
-            only_approved: bool = True,
-    ) -> list[DoctorWithDetailsEntity]:
-        stmt = (
-            select(Doctor)
-            .options(joinedload(Doctor.user), joinedload(Doctor.specialization))
-            .where(Doctor.specialization_id == specialization_id)
-        )
-
-        if only_approved:
-            stmt = stmt.where(Doctor.status == DoctorStatus.APPROVED)
-
-        result = await self._session.execute(stmt)
-        doctors = result.scalars().unique().all()
-        return [self._from_orm_with_details(d) for d in doctors]
-
-    async def get_pending_doctors(self, skip: int = 0, limit: int = 20) -> list[DoctorWithDetailsEntity]:
-        stmt = (
-            select(Doctor)
-            .options(joinedload(Doctor.user), joinedload(Doctor.specialization))
-            .where(Doctor.status == DoctorStatus.PENDING)
-            .order_by(Doctor.created_at)
-            .offset(skip)
-            .limit(limit)
-        )
         result = await self._session.execute(stmt)
         doctors = result.scalars().unique().all()
         return [self._from_orm_with_details(d) for d in doctors]

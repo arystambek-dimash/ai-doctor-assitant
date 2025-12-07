@@ -3,7 +3,7 @@ from typing import Optional
 
 from src.domain.constants import DoctorStatus
 from src.domain.entities.doctors import DoctorEntity, DoctorWithDetailsEntity
-from src.use_cases.doctors.dto import CreateDoctorDTO, UpdateDoctorDTO, ApproveDoctorDTO
+from src.use_cases.doctors.dto import CreateDoctorDTO, UpdateDoctorDTO
 
 
 class IDoctorRepository(ABC):
@@ -13,10 +13,6 @@ class IDoctorRepository(ABC):
 
     @abstractmethod
     async def update_doctor(self, doctor_id: int, doctor: UpdateDoctorDTO) -> DoctorEntity:
-        pass
-
-    @abstractmethod
-    async def update_doctor_status(self, doctor_id: int, dto: ApproveDoctorDTO) -> DoctorEntity:
         pass
 
     @abstractmethod
@@ -38,17 +34,10 @@ class IDoctorRepository(ABC):
     @abstractmethod
     async def get_all_doctors(
             self,
+            specialization_id: Optional[int] = None,
             status: Optional[DoctorStatus] = None,
             skip: int = 0,
             limit: int = 10,
-    ) -> list[DoctorWithDetailsEntity]:
-        pass
-
-    @abstractmethod
-    async def get_doctors_by_specialization(
-            self,
-            specialization_id: int,
-            only_approved: bool = True,
     ) -> list[DoctorWithDetailsEntity]:
         pass
 

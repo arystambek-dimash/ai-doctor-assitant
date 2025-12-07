@@ -42,9 +42,5 @@ class UpdateDoctorDTO(BaseDTOMixin):
     experience_years: Optional[int] = None
     specialization_id: Optional[int] = None
     license_number: Optional[str] = None
-
-
-@dataclass
-class ApproveDoctorDTO(BaseDTOMixin):
-    status: DoctorStatus
+    status: Optional[DoctorStatus] = None
     rejection_reason: Optional[str] = None
