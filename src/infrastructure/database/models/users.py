@@ -16,7 +16,7 @@ class User(Base, IdMixin, TimeStampMixin):
     phone: orm.Mapped[Optional[str]] = orm.mapped_column(sa.String(20), nullable=True)
     is_admin: orm.Mapped[bool] = orm.mapped_column(sa.Boolean, default=False)
 
-    doctor_profile = orm.relationship("Doctor", back_populates="user")
+    doctor_profile = orm.relationship("Doctor", back_populates="user", uselist=False)
     ai_consultations = orm.relationship("AIConsultation", back_populates="patient")
     appointments_as_patient = orm.relationship("Appointment", back_populates="patient")
     medical_records = orm.relationship("MedicalRecord", back_populates="patient")

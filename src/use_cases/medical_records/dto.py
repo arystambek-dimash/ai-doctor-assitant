@@ -8,7 +8,6 @@ from src.infrastructure.utilities.dto import BaseDTOMixin
 class CreateMedicalRecordDTO(BaseDTOMixin):
     diagnosis: str
     patient_id: int
-    doctor_id: int
     prescription: Optional[str] = None
     notes: Optional[str] = None
     appointment_id: Optional[int] = None
