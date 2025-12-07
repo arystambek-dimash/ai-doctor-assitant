@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from src.domain.entities.users import UserEntity
+from src.domain.entities.users import UserEntity, UserEntityWithDetails
 from src.use_cases.users.dto import CreateUserDTO, UpdateUserDTO
 
 
@@ -14,3 +14,5 @@ class IUserRepository(Protocol):
     async def get_user_by_id(self, user_id: int) -> UserEntity: ...
 
     async def get_user_by_email(self, email: str) -> UserEntity: ...
+
+    async def get_user_with_details(self, user_id: int) -> UserEntityWithDetails: ...

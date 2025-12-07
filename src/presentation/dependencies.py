@@ -1,10 +1,13 @@
+from typing import Callable, Awaitable
+
 import jwt
 from dependency_injector.wiring import inject, Provide
 from fastapi import Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from src.app.container import AppContainer
-from src.domain.errors import BadRequestException, UnauthorizedException
+from src.domain.entities.users import UserEntityWithDetails
+from src.domain.errors import UnauthorizedException
 from src.domain.interfaces.ai_consultation_repository import IAIConsultationRepository
 from src.domain.interfaces.appointment_repository import IAppointmentRepository
 from src.domain.interfaces.doctor_repository import IDoctorRepository
@@ -163,24 +166,43 @@ async def get_ai_chat_start_handler(
 
 @inject
 async def get_current_user(
-        credentials: HTTPAuthorizationCredentials = Depends(http_bearer),
+        credentials: HTTPAuthorizationCredentials | None = Depends(http_bearer),
         jwt_service: JWTService = Depends(Provide[AppContainer.jwt_service]),
         user_repository: IUserRepository = Depends(Provide[AppContainer.user_repository]),
-):
+) -> UserEntityWithDetails:
+    if credentials is None or not credentials.credentials:
+        raise UnauthorizedException("Token is required")
+
     try:
-        token = credentials.credentials
-        if not token:
-            raise BadRequestException("Token is required")
-
-        decoded_token = jwt_service.decode_access_token(token)
-
-        user_id: int | None = decoded_token.get("sub")
-        print(user_id)
-        if not user_id:
-            raise UnauthorizedException("Invalid token")
-        return await user_repository.get_user_by_id(int(user_id))
-
+        decoded = jwt_service.decode_access_token(credentials.credentials)
     except jwt.ExpiredSignatureError:
-        raise BadRequestException("Token is expired")
+        raise UnauthorizedException("Token is expired")
     except jwt.InvalidTokenError:
         raise UnauthorizedException("Invalid token")
+
+    sub = decoded.get("sub")
+    try:
+        user_id = int(sub)
+    except (TypeError, ValueError):
+        raise UnauthorizedException("Invalid token")
+
+    user = await user_repository.get_user_with_details(user_id)
+    if user is None:
+        raise UnauthorizedException("Invalid token")
+
+    return user
+
+
+def requires_roles(*, is_admin: bool = False, is_doctor: bool = False) -> Callable[
+    ..., Awaitable[UserEntityWithDetails]]:
+    async def dependency(user: UserEntityWithDetails = Depends(get_current_user)) -> UserEntityWithDetails:
+        if not is_admin and not is_doctor:
+            return user
+
+        allowed = (is_admin and user.is_admin) or (is_doctor and user.is_doctor)
+        if not allowed:
+            raise UnauthorizedException("You do not have permission to access this resource")
+
+        return user
+
+    return dependency
