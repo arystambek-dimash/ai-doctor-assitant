@@ -1,3 +1,5 @@
+from typing import List
+
 from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import StreamingResponse
 
@@ -14,43 +16,40 @@ router = APIRouter(prefix="/ai-consultations", tags=["AI Consultations"])
 @router.post(
     "",
     response_model=ConsultationResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Start a new AI consultation",
+    status_code=status.HTTP_201_CREATED
 )
 async def start_consultation(
         request: StartConsultationRequest,
         current_user: UserEntity = Depends(get_current_user),
-        ai_use_case: AIConsultationUseCase = Depends(get_ai_consultation_use_case),
+        use_case: AIConsultationUseCase = Depends(get_ai_consultation_use_case),
 ):
-    return await ai_use_case.start_consultation(request.symptoms_text, current_user.id)
+    return await use_case.start_consultation(request.symptoms_text, current_user.id)
 
 
 @router.post(
     "/{consultation_id}/messages",
-    response_model=ChatMessageResponse,
-    summary="Send a message in consultation",
+    response_model=ChatMessageResponse
 )
 async def send_message(
         consultation_id: int,
         request: SendMessageRequest,
         current_user: UserEntity = Depends(get_current_user),
-        ai_use_case: AIConsultationUseCase = Depends(get_ai_consultation_use_case),
+        use_case: AIConsultationUseCase = Depends(get_ai_consultation_use_case),
 ):
-    return await ai_use_case.send_message(consultation_id, request.content, current_user.id)
+    return await use_case.send_message(consultation_id, request.content, current_user.id)
 
 
 @router.post(
-    "/{consultation_id}/messages/stream",
-    summary="Send a message and get streaming response",
+    "/{consultation_id}/messages/stream"
 )
 async def send_message_stream(
         consultation_id: int,
         request: SendMessageRequest,
         current_user: UserEntity = Depends(get_current_user),
-        ai_use_case: AIConsultationUseCase = Depends(get_ai_consultation_use_case),
+        use_cas: AIConsultationUseCase = Depends(get_ai_consultation_use_case),
 ):
     async def generate():
-        async for chunk in ai_use_case.send_message_stream(
+        async for chunk in use_cas.send_message_stream(
                 consultation_id, request.content, current_user.id
         ):
             yield f"data: {chunk}\n\n"
@@ -68,43 +67,40 @@ async def send_message_stream(
 
 @router.post(
     "/{consultation_id}/complete",
-    response_model=ConsultationAnalysisResponse,
-    summary="Complete consultation and get final analysis",
+    response_model=ConsultationAnalysisResponse
 )
 async def complete_consultation(
         consultation_id: int,
         current_user: UserEntity = Depends(get_current_user),
-        ai_use_case: AIConsultationUseCase = Depends(get_ai_consultation_use_case),
+        use_cas: AIConsultationUseCase = Depends(get_ai_consultation_use_case),
 ):
-    return await ai_use_case.complete_consultation(consultation_id, current_user.id)
+    return await use_cas.complete_consultation(consultation_id, current_user.id)
 
 
 @router.get(
     "/me",
-    response_model=list[ConsultationResponse],
-    summary="Get my consultations",
+    response_model=List[ConsultationResponse]
 )
 async def get_my_consultations(
         skip: int = Query(0, ge=0),
         limit: int = Query(20, ge=1, le=100),
         current_user: UserEntity = Depends(get_current_user),
-        ai_use_case: AIConsultationUseCase = Depends(get_ai_consultation_use_case),
+        use_cas: AIConsultationUseCase = Depends(get_ai_consultation_use_case),
 ):
-    return await ai_use_case.get_my_consultations(current_user.id, skip=skip, limit=limit)
+    return await use_cas.get_my_consultations(current_user.id, skip=skip, limit=limit)
 
 
 @router.get(
     "/{consultation_id}",
-    response_model=ConsultationWithMessagesResponse,
-    summary="Get consultation with messages",
+    response_model=ConsultationWithMessagesResponse
 )
 async def get_consultation(
         consultation_id: int,
         current_user: UserEntity = Depends(get_current_user),
-        ai_use_case: AIConsultationUseCase = Depends(get_ai_consultation_use_case),
+        use_cas: AIConsultationUseCase = Depends(get_ai_consultation_use_case),
 ):
-    consultation = await ai_use_case.get_consultation_by_id(consultation_id, current_user.id)
-    messages = await ai_use_case.get_consultation_messages(consultation_id, current_user.id)
+    consultation = await use_cas.get_consultation_by_id(consultation_id, current_user.id)
+    messages = await use_cas.get_consultation_messages(consultation_id, current_user.id)
     return {
         "consultation": consultation,
         "messages": messages,
@@ -113,12 +109,11 @@ async def get_consultation(
 
 @router.get(
     "/{consultation_id}/messages",
-    response_model=list[ChatMessageResponse],
-    summary="Get consultation messages",
+    response_model=List[ChatMessageResponse]
 )
 async def get_consultation_messages(
         consultation_id: int,
         current_user: UserEntity = Depends(get_current_user),
-        ai_use_case: AIConsultationUseCase = Depends(get_ai_consultation_use_case),
+        use_cas: AIConsultationUseCase = Depends(get_ai_consultation_use_case),
 ):
-    return await ai_use_case.get_consultation_messages(consultation_id, current_user.id)
+    return await use_cas.get_consultation_messages(consultation_id, current_user.id)

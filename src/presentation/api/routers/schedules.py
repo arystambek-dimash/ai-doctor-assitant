@@ -1,11 +1,12 @@
 from datetime import date
+from typing import List
 
 from fastapi import APIRouter, Depends, Query, status
 
 from src.domain.entities.users import UserEntity
 from src.presentation.api.schemas.requests.schedules import ScheduleCreateRequest, ScheduleUpdateRequest
 from src.presentation.api.schemas.responses.schedules import ScheduleResponse, TimeSlotResponse
-from src.presentation.dependencies import get_current_user, get_schedule_use_case
+from src.presentation.dependencies import get_current_user, get_schedule_use_case, requires_roles
 from src.use_cases.schedules.dto import CreateScheduleDTO, UpdateScheduleDTO
 from src.use_cases.schedules.use_case import ScheduleUseCase
 
@@ -16,109 +17,99 @@ router = APIRouter(prefix="/schedules", tags=["Schedules"])
     "",
     response_model=ScheduleResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Create a new schedule for current doctor",
 )
 async def create_schedule(
         request: ScheduleCreateRequest,
-        current_user: UserEntity = Depends(get_current_user),
-        schedule_use_case: ScheduleUseCase = Depends(get_schedule_use_case),
+        current_user: UserEntity = Depends(requires_roles(is_doctor=True)),
+        use_case: ScheduleUseCase = Depends(get_schedule_use_case),
 ):
-    doctor = await schedule_use_case._doctor_repo.get_doctor_by_user_id(current_user.id)
-
-    dto = CreateScheduleDTO(
-        day_of_week=request.day_of_week,
-        start_time=request.start_time,
-        end_time=request.end_time,
-        slot_duration_minutes=request.slot_duration_minutes,
-        is_active=request.is_active,
-        doctor_id=doctor.id,
+    return await use_case.create_schedule(
+        CreateScheduleDTO(
+            day_of_week=request.day_of_week,
+            start_time=request.start_time,
+            end_time=request.end_time,
+            slot_duration_minutes=request.slot_duration_minutes,
+            is_active=request.is_active,
+            doctor_id=current_user.id,
+        )
     )
-    entity = await schedule_use_case.create_schedule(dto, current_user.id)
-    return ScheduleResponse.from_entity(entity)
 
 
 @router.get(
     "/me",
-    response_model=list[ScheduleResponse],
-    summary="Get my schedules (current doctor)",
+    response_model=List[ScheduleResponse],
 )
 async def get_my_schedules(
         current_user: UserEntity = Depends(get_current_user),
-        schedule_use_case: ScheduleUseCase = Depends(get_schedule_use_case),
+        use_case: ScheduleUseCase = Depends(get_schedule_use_case),
 ):
-    entities = await schedule_use_case.get_my_schedules(current_user.id)
-    return [ScheduleResponse.from_entity(e) for e in entities]
+    return use_case.get_my_schedules(current_user.id)
 
 
 @router.get(
     "/doctor/{doctor_id}",
-    response_model=list[ScheduleResponse],
-    summary="Get schedules by doctor ID",
+    response_model=List[ScheduleResponse],
 )
 async def get_doctor_schedules(
         doctor_id: int,
-        schedule_use_case: ScheduleUseCase = Depends(get_schedule_use_case),
+        use_case: ScheduleUseCase = Depends(get_schedule_use_case),
 ):
-    entities = await schedule_use_case.get_schedules_by_doctor_id(doctor_id)
-    return [ScheduleResponse.from_entity(e) for e in entities]
+    return await use_case.get_schedules_by_doctor_id(doctor_id)
 
 
 @router.get(
     "/doctor/{doctor_id}/slots",
-    response_model=list[TimeSlotResponse],
-    summary="Get available time slots for a doctor on a specific date",
+    response_model=List[TimeSlotResponse],
 )
 async def get_available_slots(
         doctor_id: int,
-        date: date = Query(..., description="Date to check availability"),
-        schedule_use_case: ScheduleUseCase = Depends(get_schedule_use_case),
+        slot_date: date = Query(..., description="Date to check availability"),
+        use_case: ScheduleUseCase = Depends(get_schedule_use_case),
 ):
-    return await schedule_use_case.get_available_slots(doctor_id, date)
+    return await use_case.get_available_slots(doctor_id, slot_date)
 
 
 @router.get(
     "/{schedule_id}",
     response_model=ScheduleResponse,
-    summary="Get schedule by ID",
 )
 async def get_schedule(
         schedule_id: int,
-        schedule_use_case: ScheduleUseCase = Depends(get_schedule_use_case),
+        use_case: ScheduleUseCase = Depends(get_schedule_use_case),
 ):
-    entity = await schedule_use_case.get_schedule_by_id(schedule_id)
-    return ScheduleResponse.from_entity(entity)
+    return await use_case.get_schedule_by_id(schedule_id)
 
 
 @router.patch(
     "/{schedule_id}",
     response_model=ScheduleResponse,
-    summary="Update schedule",
 )
 async def update_schedule(
         schedule_id: int,
         request: ScheduleUpdateRequest,
-        current_user: UserEntity = Depends(get_current_user),
-        schedule_use_case: ScheduleUseCase = Depends(get_schedule_use_case),
+        use_case: ScheduleUseCase = Depends(get_schedule_use_case),
+        current_user: UserEntity = Depends(requires_roles(is_doctor=True)),
 ):
-    dto = UpdateScheduleDTO(
-        day_of_week=request.day_of_week,
-        start_time=request.start_time,
-        end_time=request.end_time,
-        slot_duration_minutes=request.slot_duration_minutes,
-        is_active=request.is_active,
+    return await use_case.update_schedule(
+        schedule_id,
+        UpdateScheduleDTO(
+            day_of_week=request.day_of_week,
+            start_time=request.start_time,
+            end_time=request.end_time,
+            slot_duration_minutes=request.slot_duration_minutes,
+            is_active=request.is_active,
+        ),
+        doctor_id=current_user.id,
     )
-    entity = await schedule_use_case.update_schedule(schedule_id, dto, current_user.id)
-    return ScheduleResponse.from_entity(entity)
 
 
 @router.delete(
     "/{schedule_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete schedule",
 )
 async def delete_schedule(
         schedule_id: int,
-        current_user: UserEntity = Depends(get_current_user),
-        schedule_use_case: ScheduleUseCase = Depends(get_schedule_use_case),
+        use_case: ScheduleUseCase = Depends(get_schedule_use_case),
+        current_user: UserEntity = Depends(requires_roles(is_doctor=True))
 ):
-    await schedule_use_case.delete_schedule(schedule_id, current_user.id)
+    await use_case.delete_schedule(schedule_id, current_user.id)
