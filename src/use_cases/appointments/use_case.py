@@ -1,7 +1,9 @@
 from datetime import datetime, date
+from typing import List
 
 from src.domain.constants import AppointmentStatus
 from src.domain.entities.appointments import AppointmentEntity, AppointmentWithDetailsEntity
+from src.domain.entities.users import UserEntityWithDetails
 from src.domain.errors import BadRequestException, NotFoundException, ForbiddenException
 from src.domain.interfaces.appointment_repository import IAppointmentRepository
 from src.domain.interfaces.doctor_repository import IDoctorRepository
@@ -49,7 +51,11 @@ class AppointmentUseCase:
         return created
 
     async def update_appointment(
-            self, appointment_id: int, appointment: UpdateAppointmentDTO, user_id: int, is_admin: bool = False
+            self,
+            appointment_id: int,
+            appointment: UpdateAppointmentDTO,
+            user_id: int,
+            is_admin: bool = False
     ) -> AppointmentEntity:
         existing = await self._appointment_repo.get_appointment_by_id(appointment_id)
         if not existing:
@@ -137,17 +143,17 @@ class AppointmentUseCase:
     async def get_doctor_appointments(
             self,
             doctor_id: int,
-            user_id: int,
-            is_admin: bool = False,
+            current_user: UserEntityWithDetails,
             status: AppointmentStatus | None = None,
             date_from: date | None = None,
             date_to: date | None = None,
             skip: int = 0,
             limit: int = 20,
-    ) -> list[AppointmentWithDetailsEntity]:
-        doctor = await self._doctor_repo.get_doctor_by_user_id(user_id)
-
-        if not is_admin and (not doctor or doctor.id != doctor_id):
+    ) -> List[AppointmentWithDetailsEntity]:
+        db_doctor = await self._doctor_repo.get_doctor_by_id(doctor_id)
+        if not db_doctor:
+            raise NotFoundException("Doctor not found")
+        if not current_user.is_admin and (not db_doctor or db_doctor.id != current_user.doctor_id):
             raise ForbiddenException("Access denied")
 
         return await self._appointment_repo.get_appointments_by_doctor_id(
@@ -167,13 +173,9 @@ class AppointmentUseCase:
             date_to: date | None = None,
             skip: int = 0,
             limit: int = 20,
-    ) -> list[AppointmentWithDetailsEntity]:
-        doctor = await self._doctor_repo.get_doctor_by_user_id(user_id)
-        if not doctor:
-            raise ForbiddenException("User is not a doctor")
-
+    ) -> List[AppointmentWithDetailsEntity]:
         return await self._appointment_repo.get_appointments_by_doctor_id(
-            doctor.id,
+            user_id,
             status=status,
             date_from=date_from,
             date_to=date_to,

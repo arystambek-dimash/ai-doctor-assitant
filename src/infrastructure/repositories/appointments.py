@@ -1,4 +1,5 @@
 from datetime import datetime, date, timedelta
+from typing import List
 
 from sqlalchemy import insert, select, update, delete, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -71,7 +72,7 @@ class AppointmentRepository(IAppointmentRepository):
             status: AppointmentStatus | None = None,
             skip: int = 0,
             limit: int = 20,
-    ) -> list[AppointmentWithDetailsEntity]:
+    ) -> List[AppointmentWithDetailsEntity]:
         stmt = (
             select(Appointment)
             .options(
@@ -99,7 +100,7 @@ class AppointmentRepository(IAppointmentRepository):
             date_to: date | None = None,
             skip: int = 0,
             limit: int = 20,
-    ) -> list[AppointmentWithDetailsEntity]:
+    ) -> List[AppointmentWithDetailsEntity]:
         stmt = (
             select(Appointment)
             .options(
@@ -127,7 +128,7 @@ class AppointmentRepository(IAppointmentRepository):
 
     async def get_doctor_appointments_for_date(
             self, doctor_id: int, target_date: date
-    ) -> list[AppointmentEntity]:
+    ) -> List[AppointmentEntity]:
         start_of_day = datetime.combine(target_date, datetime.min.time())
         end_of_day = datetime.combine(target_date, datetime.max.time())
 
