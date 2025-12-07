@@ -2,11 +2,10 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from src.domain.constants import DoctorStatus
 
-# ==================== REQUEST SCHEMAS ====================
 
 class DoctorRegisterRequest(BaseModel):
-    """User self-registration as doctor."""
     bio: str = Field(..., min_length=10, max_length=2000)
     experience_years: int = Field(..., ge=0, le=70)
     license_number: str = Field(..., min_length=5, max_length=100)
@@ -24,7 +23,6 @@ class DoctorRegisterRequest(BaseModel):
 
 
 class AdminCreateDoctorRequest(BaseModel):
-    """Admin creates doctor for existing user."""
     user_id: int
     bio: str = Field(..., min_length=10, max_length=2000)
     experience_years: int = Field(..., ge=0, le=70)
@@ -50,5 +48,6 @@ class DoctorUpdateRequest(BaseModel):
     specialization_id: Optional[int] = None
 
 
-class RejectDoctorRequest(BaseModel):
-    reason: str = Field(..., min_length=10, max_length=500)
+class AdminDoctorUpdateRequest(DoctorUpdateRequest):
+    status: DoctorStatus = Field(...)
+    rejection_reason: str = Field(..., min_length=10, max_length=500)
