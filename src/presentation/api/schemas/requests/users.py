@@ -8,6 +8,7 @@ class UserCreateRequest(BaseModel):
     password: str = Field(..., min_length=8)
     full_name: str = Field(..., min_length=1, max_length=100)
     phone: str = Field(..., min_length=10, max_length=20)
+    is_admin: bool = Field(default=False)
 
     class Config:
         json_schema_extra = {
@@ -15,7 +16,8 @@ class UserCreateRequest(BaseModel):
                 "email": "user@example.com",
                 "password": "securepassword123",
                 "full_name": "John Doe",
-                "phone": "+1234567890"
+                "phone": "+1234567890",
+                "is_admin": True,
             }
         }
 
