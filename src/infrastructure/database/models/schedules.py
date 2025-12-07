@@ -3,7 +3,7 @@ from datetime import time
 import sqlalchemy as sa
 import sqlalchemy.orm as orm
 
-from . import IdMixin, TimeStampMixin
+from . import IdMixin
 from ..core import Base
 
 

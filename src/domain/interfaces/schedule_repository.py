@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from src.domain.entities.schedules import ScheduleEntity, ScheduleWithDoctorEntity
+from src.domain.entities.schedules import ScheduleEntity
 from src.use_cases.schedules.dto import CreateScheduleDTO, UpdateScheduleDTO
 
 
@@ -19,12 +19,16 @@ class IScheduleRepository(ABC):
         pass
 
     @abstractmethod
+    async def get_schedule_by_id_doctor_id(self, schedule_id: int, doctor_id: int) -> Optional[ScheduleEntity]:
+        pass
+
+    @abstractmethod
     async def get_schedules_by_doctor_id(self, doctor_id: int) -> list[ScheduleEntity]:
         pass
 
     @abstractmethod
     async def get_schedule_by_doctor_and_day(
-        self, doctor_id: int, day_of_week: int
+            self, doctor_id: int, day_of_week: int
     ) -> Optional[ScheduleEntity]:
         pass
 

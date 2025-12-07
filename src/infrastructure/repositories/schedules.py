@@ -85,6 +85,14 @@ class ScheduleRepository(IScheduleRepository):
         result = await self._session.execute(stmt)
         return result.rowcount > 0
 
+    async def get_schedule_by_id_doctor_id(self, schedule_id: int, doctor_id: int) -> ScheduleEntity | None:
+        stmt = select(Schedule).where(Schedule.doctor_id == doctor_id)
+        result = await self._session.execute(stmt)
+        obj = result.scalar_one_or_none()
+        if obj is None:
+            return None
+        return self._from_orm(obj)
+
     @staticmethod
     def _from_orm(obj: Schedule) -> ScheduleEntity:
         return ScheduleEntity(

@@ -29,16 +29,7 @@ class ScheduleUseCase:
         self._schedule_repo = schedule_repository
         self._doctor_repo = doctor_repository
 
-    async def create_schedule(self, schedule: CreateScheduleDTO, user_id: int) -> ScheduleEntity:
-        doctor = await self._doctor_repo.get_doctor_by_user_id(user_id)
-        if not doctor:
-            raise ForbiddenException("User is not a doctor")
-
-        if doctor.id != schedule.doctor_id:
-            raise ForbiddenException("Cannot create schedule for another doctor")
-
-        self._validate_schedule(schedule)
-
+    async def create_schedule(self, schedule: CreateScheduleDTO) -> ScheduleEntity:
         existing = await self._schedule_repo.get_schedule_by_doctor_and_day(
             schedule.doctor_id, schedule.day_of_week
         )
@@ -51,16 +42,14 @@ class ScheduleUseCase:
         return created
 
     async def update_schedule(
-            self, schedule_id: int, schedule: UpdateScheduleDTO, user_id: int
+            self,
+            schedule_id: int,
+            schedule: UpdateScheduleDTO,
+            doctor_id: int,
     ) -> ScheduleEntity:
-        existing = await self._schedule_repo.get_schedule_by_id(schedule_id)
+        existing = await self._schedule_repo.get_schedule_by_id_doctor_id(schedule_id, doctor_id=doctor_id)
         if not existing:
             raise NotFoundException("Schedule not found")
-
-        doctor = await self._doctor_repo.get_doctor_by_user_id(user_id)
-        if not doctor or doctor.id != existing.doctor_id:
-            raise ForbiddenException("Cannot update another doctor's schedule")
-
         if schedule.day_of_week is not None and schedule.day_of_week != existing.day_of_week:
             day_exists = await self._schedule_repo.get_schedule_by_doctor_and_day(
                 existing.doctor_id, schedule.day_of_week
@@ -70,7 +59,6 @@ class ScheduleUseCase:
                 raise BadRequestException(f"Schedule already exists for {day_name}")
 
         self._validate_schedule_update(existing, schedule)
-
         async with self._uow:
             updated = await self._schedule_repo.update_schedule(schedule_id, schedule)
         return updated
@@ -117,14 +105,10 @@ class ScheduleUseCase:
 
         return slots
 
-    async def delete_schedule(self, schedule_id: int, user_id: int) -> bool:
-        existing = await self._schedule_repo.get_schedule_by_id(schedule_id)
+    async def delete_schedule(self, schedule_id: int, doctor_id: int) -> bool:
+        existing = await self._schedule_repo.get_schedule_by_id_doctor_id(schedule_id, doctor_id=doctor_id)
         if not existing:
             raise NotFoundException("Schedule not found")
-
-        doctor = await self._doctor_repo.get_doctor_by_user_id(user_id)
-        if not doctor or doctor.id != existing.doctor_id:
-            raise ForbiddenException("Cannot delete another doctor's schedule")
 
         async with self._uow:
             return await self._schedule_repo.delete_schedule(schedule_id)
