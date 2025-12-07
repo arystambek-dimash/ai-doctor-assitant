@@ -7,6 +7,7 @@ class UserResponse(BaseModel):
     full_name: str
     phone: str
     is_admin: bool
+    is_doctor: bool
 
     class Config:
         from_attributes = True
@@ -19,8 +20,7 @@ class TokenResponse(BaseModel):
 
 class LoginResponse(BaseModel):
     access_token: str
-    token_type: str = "bearer"
-    user: UserResponse
+    refresh_token: str
 
 
 class MessageResponse(BaseModel):
