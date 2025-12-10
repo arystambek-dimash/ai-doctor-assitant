@@ -2,6 +2,7 @@ from typing import List
 
 from fastapi import APIRouter, Depends, Query, status
 
+from src.domain.constants import DoctorStatus
 from src.domain.entities.users import UserEntity
 from src.presentation.api.schemas.requests.doctors import (
     DoctorRegisterRequest,
@@ -79,14 +80,16 @@ async def withdraw_application(
 
 @router.get(
     "",
-    response_model=List[DoctorPublicResponse],
+    response_model=List[DoctorWithDetailsResponse],
 )
 async def get_all_doctors(
         skip: int = Query(0, ge=0),
         limit: int = Query(10, ge=1, le=100),
+        status: DoctorStatus = Query(None),
         use_case: DoctorUseCase = Depends(get_doctor_use_case),
+        current_user: UserEntity = Depends(get_current_user),
 ):
-    return await use_case.get_all_doctors(skip=skip, limit=limit, is_admin=False)
+    return await use_case.get_all_doctors(skip=skip, limit=limit,status=status, is_admin=current_user.is_admin)
 
 
 @router.get(

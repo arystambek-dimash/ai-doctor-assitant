@@ -3,7 +3,7 @@ from typing import List
 
 from fastapi import APIRouter, Depends, Query, status
 
-from src.domain.entities.users import UserEntity
+from src.domain.entities.users import UserEntity, UserEntityWithDetails
 from src.presentation.api.schemas.requests.schedules import ScheduleCreateRequest, ScheduleUpdateRequest
 from src.presentation.api.schemas.responses.schedules import ScheduleResponse, TimeSlotResponse
 from src.presentation.dependencies import get_current_user, get_schedule_use_case, requires_roles
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/schedules", tags=["Schedules"])
 )
 async def create_schedule(
         request: ScheduleCreateRequest,
-        current_user: UserEntity = Depends(requires_roles(is_doctor=True)),
+        current_user: UserEntityWithDetails = Depends(requires_roles(is_doctor=True)),
         use_case: ScheduleUseCase = Depends(get_schedule_use_case),
 ):
     return await use_case.create_schedule(
@@ -30,7 +30,7 @@ async def create_schedule(
             end_time=request.end_time,
             slot_duration_minutes=request.slot_duration_minutes,
             is_active=request.is_active,
-            doctor_id=current_user.id,
+            doctor_id=current_user.doctor_id,
         )
     )
 
@@ -43,7 +43,7 @@ async def get_my_schedules(
         current_user: UserEntity = Depends(get_current_user),
         use_case: ScheduleUseCase = Depends(get_schedule_use_case),
 ):
-    return use_case.get_my_schedules(current_user.id)
+    return await use_case.get_my_schedules(current_user.id)
 
 
 @router.get(

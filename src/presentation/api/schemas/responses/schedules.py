@@ -6,7 +6,6 @@ from pydantic import BaseModel
 class ScheduleResponse(BaseModel):
     id: int
     day_of_week: int
-    day_name: str
     start_time: time
     end_time: time
     slot_duration_minutes: int
@@ -19,7 +18,6 @@ class ScheduleResponse(BaseModel):
         return cls(
             id=entity.id,
             day_of_week=entity.day_of_week,
-            day_name=days[entity.day_of_week],
             start_time=entity.start_time,
             end_time=entity.end_time,
             slot_duration_minutes=entity.slot_duration_minutes,

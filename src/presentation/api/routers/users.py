@@ -19,7 +19,7 @@ async def register(
         request: UserCreateRequest,
         use_case: UserUseCase = Depends(get_user_use_case),
 ):
-    return await use_case.register(
+    return UserResponse.from_orm(await use_case.register(
         CreateUserDTO(
             email=request.email.__str__(),
             password_hash=request.password,
@@ -28,6 +28,7 @@ async def register(
             is_admin=request.is_admin,
         )
     )
+                                 )
 
 
 @router.post(

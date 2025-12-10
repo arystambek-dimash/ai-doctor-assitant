@@ -81,6 +81,7 @@ async def get_doctor_medical_records(
 ):
     return await use_case.get_doctor_medical_records(
         doctor_id,
+        current_user=current_user,
         skip=skip,
         limit=limit,
     )
