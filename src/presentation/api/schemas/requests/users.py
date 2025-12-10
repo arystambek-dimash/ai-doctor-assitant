@@ -40,3 +40,4 @@ class UserUpdateRequest(BaseModel):
     password: Optional[str] = Field(None, min_length=8)
     full_name: Optional[str] = Field(None, min_length=1, max_length=100)
     phone: Optional[str] = Field(None, min_length=10, max_length=20)
+    is_admin: Optional[bool] = None

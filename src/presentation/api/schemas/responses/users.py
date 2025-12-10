@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import BaseModel
 
 
@@ -7,7 +9,8 @@ class UserResponse(BaseModel):
     full_name: str
     phone: str
     is_admin: bool
-    is_doctor: bool
+    is_doctor: Optional[bool] = None
+    doctor_id: Optional[int] = None
 
     class Config:
         from_attributes = True

@@ -1,10 +1,12 @@
+from typing import List
+
 from src.domain.entities.users import UserEntity
 from src.domain.errors import BadRequestException, NotFoundException
 from src.domain.interfaces.uow import IUoW
 from src.domain.interfaces.user_repository import IUserRepository
 from src.infrastructure.services.jwt_service import JWTService
 from src.infrastructure.services.password_service import PasswordService
-from src.use_cases.users.dto import CreateUserDTO, LoginUserDTO
+from src.use_cases.users.dto import CreateUserDTO, LoginUserDTO, UpdateUserDTO
 
 
 class UserUseCase:
@@ -46,3 +48,32 @@ class UserUseCase:
             "refresh_token": refresh_token,
             "token_type": "bearer",
         }
+
+    async def get_all_users(self, skip: int = 0, limit: int = 20) -> List[UserEntity]:
+        async with self._uow:
+            return await self._user_repo.get_all_users(skip=skip, limit=limit)
+
+    async def get_all_patients(self, skip: int = 0, limit: int = 20) -> List[UserEntity]:
+        async with self._uow:
+            return await self._user_repo.get_all_patients(skip=skip, limit=limit)
+
+    async def get_user_by_id(self, user_id: int) -> UserEntity:
+        async with self._uow:
+            user = await self._user_repo.get_user_by_id(user_id)
+            if not user:
+                raise NotFoundException("User not found")
+            return user
+
+    async def update_user(self, user_id: int, dto: UpdateUserDTO) -> UserEntity:
+        async with self._uow:
+            user = await self._user_repo.get_user_by_id(user_id)
+            if not user:
+                raise NotFoundException("User not found")
+            return await self._user_repo.update_user(user_id, dto)
+
+    async def delete_user(self, user_id: int) -> None:
+        async with self._uow:
+            user = await self._user_repo.get_user_by_id(user_id)
+            if not user:
+                raise NotFoundException("User not found")
+            await self._user_repo.delete_user(user_id)
