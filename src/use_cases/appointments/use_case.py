@@ -31,7 +31,7 @@ class AppointmentUseCase:
         if appointment.patient_id != user_id:
             raise ForbiddenException("Cannot book appointment for another user")
 
-        if appointment.date_time <= datetime.now():
+        if appointment.date_time.replace(tzinfo=None) <= datetime.now():
             raise BadRequestException("Cannot book appointment in the past")
 
         doctor = await self._doctor_repo.get_doctor_by_id(appointment.doctor_id)

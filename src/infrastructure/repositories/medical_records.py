@@ -1,4 +1,4 @@
-from sqlalchemy import insert, select, update, delete
+from sqlalchemy import insert, select, update, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -114,6 +114,11 @@ class MedicalRecordRepository(IMedicalRecordRepository):
         stmt = delete(MedicalRecord).where(MedicalRecord.id == record_id)
         result = await self._session.execute(stmt)
         return result.rowcount > 0
+
+    async def count_all_medical_records(self) -> int:
+        stmt = select(func.count()).select_from(MedicalRecord)
+        result = await self._session.execute(stmt)
+        return result.scalar_one()
 
     @staticmethod
     def _from_orm(obj: MedicalRecord) -> MedicalRecordEntity:

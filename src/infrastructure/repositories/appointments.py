@@ -1,7 +1,7 @@
 from datetime import datetime, date, timedelta
 from typing import List
 
-from sqlalchemy import insert, select, update, delete, and_, or_
+from sqlalchemy import insert, select, update, delete, and_, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -182,6 +182,38 @@ class AppointmentRepository(IAppointmentRepository):
         result = await self._session.execute(stmt)
         return result.rowcount > 0
 
+    async def count_all_appointments(self) -> int:
+        stmt = select(func.count()).select_from(Appointment)
+        result = await self._session.execute(stmt)
+        return result.scalar_one()
+
+    async def count_today_appointments(self) -> int:
+        today = date.today()
+        start_of_day = datetime.combine(today, datetime.min.time())
+        end_of_day = datetime.combine(today, datetime.max.time())
+
+        stmt = (
+            select(func.count())
+            .select_from(Appointment)
+            .where(
+                and_(
+                    Appointment.date_time >= start_of_day,
+                    Appointment.date_time <= end_of_day,
+                )
+            )
+        )
+        result = await self._session.execute(stmt)
+        return result.scalar_one()
+
+    async def count_appointments_by_status(self, status: AppointmentStatus) -> int:
+        stmt = (
+            select(func.count())
+            .select_from(Appointment)
+            .where(Appointment.status == status)
+        )
+        result = await self._session.execute(stmt)
+        return result.scalar_one()
+
     @staticmethod
     def _from_orm(obj: Appointment) -> AppointmentEntity:
         return AppointmentEntity(
@@ -212,5 +244,5 @@ class AppointmentRepository(IAppointmentRepository):
             patient_email=obj.patient.email,
             patient_phone=obj.patient.phone,
             doctor_name=obj.doctor.user.full_name,
-            specialization_name=obj.doctor.specialization.name,
+            specialization_name=obj.doctor.specialization.title,
         )
