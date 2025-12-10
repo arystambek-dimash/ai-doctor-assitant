@@ -59,7 +59,7 @@ class DoctorUseCase:
     async def get_pending_doctors(
             self, skip: int = 0, limit: int = 20
     ) -> List[DoctorWithDetailsEntity]:
-        return await self._doctor_repo.get_pending_doctors(skip=skip, limit=limit)
+        return await self._doctor_repo.get_all_doctors(skip=skip, limit=limit, status=DoctorStatus.PENDING)
 
     async def register_as_doctor(self, dto: RegisterDoctorDTO, user_id: int) -> DoctorEntity:
         existing_doctor = await self._doctor_repo.get_doctor_by_user_id(user_id)
@@ -130,6 +130,31 @@ class DoctorUseCase:
         async with self._uow:
             updated = await self._doctor_repo.update_doctor(doctor_id, dto)
         return updated
+    async def change_doctor_status(
+            self,
+            doctor_id: int,
+            status: DoctorStatus,
+            rejection_reason: Optional[str] = None
+    ) -> DoctorEntity:
+        """
+        Change the status of a doctor (approve, reject, suspend, or set to pending).
+        """
+        doctor = await self._doctor_repo.get_doctor_by_id(doctor_id)
+        if not doctor:
+            raise NotFoundException("Doctor not found")
+
+        if status == DoctorStatus.REJECTED and not rejection_reason:
+            raise BadRequestException("Rejection reason is required when rejecting a doctor")
+
+        update_dto = UpdateDoctorDTO(
+            status=status,
+            rejection_reason=rejection_reason if status == DoctorStatus.REJECTED else None
+        )
+
+        async with self._uow:
+            updated_doctor = await self._doctor_repo.update_doctor(doctor_id, update_dto)
+
+        return updated_doctor
 
     async def get_doctor_by_id(self, doctor_id: int) -> DoctorWithDetailsEntity:
         doctor = await self._doctor_repo.get_doctor_with_details(doctor_id)

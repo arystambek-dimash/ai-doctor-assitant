@@ -50,4 +50,18 @@ class DoctorUpdateRequest(BaseModel):
 
 class AdminDoctorUpdateRequest(DoctorUpdateRequest):
     status: DoctorStatus = Field(...)
-    rejection_reason: str = Field(..., min_length=10, max_length=500)
+    rejection_reason: str = Field(None, min_length=10, max_length=500)
+
+
+class ChangeDoctorStatusRequest(BaseModel):
+    status: DoctorStatus = Field(..., description="New status for the doctor")
+    rejection_reason: Optional[str] = Field(None, min_length=10, max_length=500,
+                                            description="Required when rejecting a doctor")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "status": "approved",
+                "rejection_reason": None
+            }
+        }

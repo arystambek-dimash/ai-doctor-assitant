@@ -1,7 +1,7 @@
 from abc import ABC
 from typing import Optional
 
-from sqlalchemy import insert, select, update, delete
+from sqlalchemy import insert, select, update, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -93,10 +93,26 @@ class DoctorRepository(IDoctorRepository, ABC):
         doctors = result.scalars().unique().all()
         return [self._from_orm_with_details(d) for d in doctors]
 
+    async def get_doctors_by_specialization(self, specialization_id: int) -> list[DoctorWithDetailsEntity]:
+        stmt = (
+            select(Doctor)
+            .options(joinedload(Doctor.user), joinedload(Doctor.specialization))
+        )
+        if specialization_id:
+            stmt = stmt.where(Doctor.specialization_id == specialization_id)
+        result = await self._session.execute(stmt)
+        doctors = result.scalars().unique().all()
+        return [self._from_orm_with_details(d) for d in doctors]
+
     async def delete_doctor(self, doctor_id: int) -> bool:
         stmt = delete(Doctor).where(Doctor.id == doctor_id)
         result = await self._session.execute(stmt)
         return result.rowcount > 0
+
+    async def count_all_doctors(self) -> int:
+        stmt = select(func.count()).select_from(Doctor)
+        result = await self._session.execute(stmt)
+        return result.scalar_one()
 
     @staticmethod
     def _from_orm(obj: Doctor) -> DoctorEntity:

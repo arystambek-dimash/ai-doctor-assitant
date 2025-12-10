@@ -42,9 +42,9 @@ class IDoctorRepository(ABC):
         pass
 
     @abstractmethod
-    async def get_pending_doctors(self, skip: int = 0, limit: int = 20) -> list[DoctorWithDetailsEntity]:
+    async def delete_doctor(self, doctor_id: int) -> bool:
         pass
 
     @abstractmethod
-    async def delete_doctor(self, doctor_id: int) -> bool:
+    async def get_doctors_by_specialization(self, specialization_id: int) -> list[DoctorWithDetailsEntity]:
         pass
