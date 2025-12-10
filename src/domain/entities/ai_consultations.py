@@ -6,9 +6,10 @@ from datetime import datetime
 class AIConsultationEntity:
     id: int
     symptoms_text: str
-    recommended_specialization: str
-    confidence: float
-    ai_response_raw: str
+    recommended_specialization: str | None
+    confidence: float | None
+    ai_response_raw: str | None
+    status: str
     created_at: datetime
     patient_id: int
 

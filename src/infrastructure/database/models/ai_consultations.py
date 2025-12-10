@@ -11,9 +11,10 @@ class AIConsultation(Base, IdMixin):
     __tablename__ = "ai_consultations"
 
     symptoms_text: orm.Mapped[str] = orm.mapped_column(sa.Text)
-    recommended_specialization: orm.Mapped[str] = orm.mapped_column(sa.String(100))
-    confidence: orm.Mapped[float] = orm.mapped_column(sa.Float)
-    ai_response_raw: orm.Mapped[str] = orm.mapped_column(sa.Text)  # Full JSON response
+    recommended_specialization: orm.Mapped[str | None] = orm.mapped_column(sa.String(100), nullable=True)
+    confidence: orm.Mapped[float | None] = orm.mapped_column(sa.Float, nullable=True)
+    ai_response_raw: orm.Mapped[str | None] = orm.mapped_column(sa.Text, nullable=True)  # Full JSON response
+    status: orm.Mapped[str] = orm.mapped_column(sa.String(20), default="active")
     created_at: orm.Mapped[datetime] = orm.mapped_column(sa.DateTime, default=datetime.utcnow)
 
     patient_id: orm.Mapped[int] = orm.mapped_column(
