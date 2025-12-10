@@ -46,10 +46,10 @@ async def send_message_stream(
         consultation_id: int,
         request: SendMessageRequest,
         current_user: UserEntity = Depends(get_current_user),
-        use_cas: AIConsultationUseCase = Depends(get_ai_consultation_use_case),
+        use_case: AIConsultationUseCase = Depends(get_ai_consultation_use_case),
 ):
     async def generate():
-        async for chunk in use_cas.send_message_stream(
+        async for chunk in use_case.send_message_stream(
                 consultation_id, request.content, current_user.id
         ):
             yield f"data: {chunk}\n\n"
@@ -72,9 +72,9 @@ async def send_message_stream(
 async def complete_consultation(
         consultation_id: int,
         current_user: UserEntity = Depends(get_current_user),
-        use_cas: AIConsultationUseCase = Depends(get_ai_consultation_use_case),
+        use_case: AIConsultationUseCase = Depends(get_ai_consultation_use_case),
 ):
-    return await use_cas.complete_consultation(consultation_id, current_user.id)
+    return await use_case.complete_consultation(consultation_id, current_user.id)
 
 
 @router.get(
@@ -85,9 +85,9 @@ async def get_my_consultations(
         skip: int = Query(0, ge=0),
         limit: int = Query(20, ge=1, le=100),
         current_user: UserEntity = Depends(get_current_user),
-        use_cas: AIConsultationUseCase = Depends(get_ai_consultation_use_case),
+        use_case: AIConsultationUseCase = Depends(get_ai_consultation_use_case),
 ):
-    return await use_cas.get_my_consultations(current_user.id, skip=skip, limit=limit)
+    return await use_case.get_my_consultations(current_user.id, skip=skip, limit=limit)
 
 
 @router.get(
@@ -97,10 +97,10 @@ async def get_my_consultations(
 async def get_consultation(
         consultation_id: int,
         current_user: UserEntity = Depends(get_current_user),
-        use_cas: AIConsultationUseCase = Depends(get_ai_consultation_use_case),
+        use_case: AIConsultationUseCase = Depends(get_ai_consultation_use_case),
 ):
-    consultation = await use_cas.get_consultation_by_id(consultation_id, current_user.id)
-    messages = await use_cas.get_consultation_messages(consultation_id, current_user.id)
+    consultation = await use_case.get_consultation_by_id(consultation_id, current_user.id)
+    messages = await use_case.get_consultation_messages(consultation_id, current_user.id)
     return {
         "consultation": consultation,
         "messages": messages,
@@ -114,6 +114,6 @@ async def get_consultation(
 async def get_consultation_messages(
         consultation_id: int,
         current_user: UserEntity = Depends(get_current_user),
-        use_cas: AIConsultationUseCase = Depends(get_ai_consultation_use_case),
+        use_case: AIConsultationUseCase = Depends(get_ai_consultation_use_case),
 ):
-    return await use_cas.get_consultation_messages(consultation_id, current_user.id)
+    return await use_case.get_consultation_messages(consultation_id, current_user.id)

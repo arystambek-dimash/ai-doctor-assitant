@@ -1,12 +1,13 @@
 import json
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator
 
+from openai import AsyncOpenAI
 
 
 class OpenAIService:
     def __init__(self, api_key: str):
-        self._client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-        self._model = settings.OPENAI_MODEL or "gpt-4-turbo-preview"
+        self._client = AsyncOpenAI(api_key=api_key)
+        self._model = "gpt-4-turbo-preview"
 
     def _get_system_prompt(self) -> str:
         return """You are an AI medical assistant for a healthcare platform. Your role is to:
@@ -39,9 +40,9 @@ When ready to recommend, respond with a JSON block like this:
 Until you have enough information, just respond conversationally without the JSON block."""
 
     async def chat_stream(
-        self,
-        messages: list[dict],
-        temperature: float = 0.7,
+            self,
+            messages: list[dict],
+            temperature: float = 0.7,
     ) -> AsyncGenerator[str, None]:
         system_message = {"role": "system", "content": self._get_system_prompt()}
         all_messages = [system_message] + messages
@@ -58,9 +59,9 @@ Until you have enough information, just respond conversationally without the JSO
                 yield chunk.choices[0].delta.content
 
     async def chat(
-        self,
-        messages: list[dict],
-        temperature: float = 0.7,
+            self,
+            messages: list[dict],
+            temperature: float = 0.7,
     ) -> str:
         system_message = {"role": "system", "content": self._get_system_prompt()}
         all_messages = [system_message] + messages
@@ -74,9 +75,9 @@ Until you have enough information, just respond conversationally without the JSO
         return response.choices[0].message.content
 
     async def analyze_symptoms(
-        self,
-        symptoms: str,
-        conversation_history: list[dict],
+            self,
+            symptoms: str,
+            conversation_history: list[dict],
     ) -> dict:
         analysis_prompt = f"""Based on the following conversation about symptoms, provide a final analysis.
 

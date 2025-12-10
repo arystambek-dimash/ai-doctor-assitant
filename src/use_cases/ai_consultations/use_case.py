@@ -45,53 +45,64 @@ class AIConsultationUseCase:
     async def send_message_stream(
             self, consultation_id: int, content: str, user_id: int
     ) -> AsyncGenerator[str, None]:
-        consultation = await self._consultation_repo.get_consultation_by_id(consultation_id)
-        if not consultation:
-            raise NotFoundException("Consultation not found")
-
-        if consultation.patient_id != user_id:
-            raise ForbiddenException("Access denied")
-
+        # Validate access within UoW context
         async with self._uow:
+            consultation = await self._consultation_repo.get_consultation_by_id(consultation_id)
+            if not consultation:
+                raise NotFoundException("Consultation not found")
+
+            if consultation.patient_id != user_id:
+                raise ForbiddenException("Access denied")
+
+            # Add user message
             await self._consultation_repo.add_message(consultation_id, "user", content)
 
-        messages = await self._consultation_repo.get_messages_by_consultation_id(consultation_id)
-        chat_messages = [{"role": m.role, "content": m.content} for m in messages]
+            # Get all messages for the chat
+            messages = await self._consultation_repo.get_messages_by_consultation_id(consultation_id)
+            chat_messages = [{"role": m.role, "content": m.content} for m in messages]
 
+        # Stream response (outside UoW)
         full_response = ""
         async for chunk in self._openai_service.chat_stream(chat_messages):
             full_response += chunk
             yield chunk
 
+        # Save assistant response within UoW context
         async with self._uow:
             await self._consultation_repo.add_message(consultation_id, "assistant", full_response)
 
+        # Process recommendation if present
         if "```json" in full_response:
             await self._process_recommendation(consultation_id, full_response)
 
     async def send_message(
             self, consultation_id: int, content: str, user_id: int
     ) -> ChatMessageEntity:
-        consultation = await self._consultation_repo.get_consultation_by_id(consultation_id)
-        if not consultation:
-            raise NotFoundException("Consultation not found")
-
-        if consultation.patient_id != user_id:
-            raise ForbiddenException("Access denied")
-
+        # Validate access and add user message within UoW context
         async with self._uow:
+            consultation = await self._consultation_repo.get_consultation_by_id(consultation_id)
+            if not consultation:
+                raise NotFoundException("Consultation not found")
+
+            if consultation.patient_id != user_id:
+                raise ForbiddenException("Access denied")
+
             await self._consultation_repo.add_message(consultation_id, "user", content)
 
-        messages = await self._consultation_repo.get_messages_by_consultation_id(consultation_id)
-        chat_messages = [{"role": m.role, "content": m.content} for m in messages]
+            # Get all messages for the chat
+            messages = await self._consultation_repo.get_messages_by_consultation_id(consultation_id)
+            chat_messages = [{"role": m.role, "content": m.content} for m in messages]
 
+        # Get AI response (outside UoW)
         response = await self._openai_service.chat(chat_messages)
 
+        # Save assistant response within UoW context
         async with self._uow:
             message = await self._consultation_repo.add_message(
                 consultation_id, "assistant", response
             )
 
+        # Process recommendation if present
         if "```json" in response:
             await self._process_recommendation(consultation_id, response)
 
@@ -119,35 +130,37 @@ class AIConsultationUseCase:
     async def complete_consultation(
             self, consultation_id: int, user_id: int
     ) -> dict:
-        consultation = await self._consultation_repo.get_consultation_by_id(consultation_id)
-        if not consultation:
-            raise NotFoundException("Consultation not found")
+        # Validate access and get messages within UoW context
+        async with self._uow:
+            consultation = await self._consultation_repo.get_consultation_by_id(consultation_id)
+            if not consultation:
+                raise NotFoundException("Consultation not found")
 
-        if consultation.patient_id != user_id:
-            raise ForbiddenException("Access denied")
+            if consultation.patient_id != user_id:
+                raise ForbiddenException("Access denied")
 
-        messages = await self._consultation_repo.get_messages_by_consultation_id(consultation_id)
-        chat_messages = [{"role": m.role, "content": m.content} for m in messages]
+            messages = await self._consultation_repo.get_messages_by_consultation_id(consultation_id)
+            chat_messages = [{"role": m.role, "content": m.content} for m in messages]
 
         analysis = await self._openai_service.analyze_symptoms(
             consultation.symptoms_text, chat_messages
         )
 
         specialization = analysis.get("recommended_specialization")
-        doctors = []
-        if specialization:
-            spec = await self._specialization_repo.get_specialization_by_title(specialization)
-            if spec:
-                doctors = await self._doctor_repo.get_doctors_by_specialization(spec.id)
-
-        update_dto = UpdateConsultationDTO(
-            recommended_specialization=specialization,
-            confidence=analysis.get("confidence"),
-            ai_response_raw=json.dumps(analysis),
-            status="completed",
-        )
 
         async with self._uow:
+            doctors = []
+            if specialization:
+                spec = await self._specialization_repo.get_specialization_by_title(specialization)
+                if spec:
+                    doctors = await self._doctor_repo.get_doctors_by_specialization(spec.id)
+
+            update_dto = UpdateConsultationDTO(
+                recommended_specialization=specialization,
+                confidence=analysis.get("confidence"),
+                ai_response_raw=json.dumps(analysis),
+                status="completed",
+            )
             await self._consultation_repo.update_consultation(consultation_id, update_dto)
 
         return {
@@ -158,30 +171,33 @@ class AIConsultationUseCase:
     async def get_consultation_by_id(
             self, consultation_id: int, user_id: int
     ) -> AIConsultationEntity:
-        consultation = await self._consultation_repo.get_consultation_by_id(consultation_id)
-        if not consultation:
-            raise NotFoundException("Consultation not found")
+        async with self._uow:
+            consultation = await self._consultation_repo.get_consultation_by_id(consultation_id)
+            if not consultation:
+                raise NotFoundException("Consultation not found")
 
-        if consultation.patient_id != user_id:
-            raise ForbiddenException("Access denied")
+            if consultation.patient_id != user_id:
+                raise ForbiddenException("Access denied")
 
-        return consultation
+            return consultation
 
     async def get_consultation_messages(
             self, consultation_id: int, user_id: int
     ) -> list[ChatMessageEntity]:
-        consultation = await self._consultation_repo.get_consultation_by_id(consultation_id)
-        if not consultation:
-            raise NotFoundException("Consultation not found")
+        async with self._uow:
+            consultation = await self._consultation_repo.get_consultation_by_id(consultation_id)
+            if not consultation:
+                raise NotFoundException("Consultation not found")
 
-        if consultation.patient_id != user_id:
-            raise ForbiddenException("Access denied")
+            if consultation.patient_id != user_id:
+                raise ForbiddenException("Access denied")
 
-        return await self._consultation_repo.get_messages_by_consultation_id(consultation_id)
+            return await self._consultation_repo.get_messages_by_consultation_id(consultation_id)
 
     async def get_my_consultations(
             self, user_id: int, skip: int = 0, limit: int = 20
     ) -> list[AIConsultationEntity]:
-        return await self._consultation_repo.get_consultations_by_patient_id(
-            user_id, skip=skip, limit=limit
-        )
+        async with self._uow:
+            return await self._consultation_repo.get_consultations_by_patient_id(
+                user_id, skip=skip, limit=limit
+            )

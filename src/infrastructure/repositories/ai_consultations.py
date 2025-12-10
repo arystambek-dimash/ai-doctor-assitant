@@ -103,6 +103,7 @@ class AIConsultationRepository(IAIConsultationRepository):
             ai_response_raw=obj.ai_response_raw,
             created_at=obj.created_at,
             patient_id=obj.patient_id,
+            status=obj.status,
         )
 
     @staticmethod

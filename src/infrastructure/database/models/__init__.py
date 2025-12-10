@@ -1,6 +1,7 @@
 from src.infrastructure.utilities.model_mixins import IdMixin, TimeStampMixin
 from .ai_consultations import AIConsultation
 from .appointments import Appointment
+from .chat import ChatMessage
 from .doctors import Doctor
 from .medical_records import MedicalRecord
 from .schedules import Schedule
@@ -16,5 +17,6 @@ __all__ = [
     "Schedule",
     "Appointment",
     "AIConsultation",
+    "ChatMessage",
     "MedicalRecord",
 ]
