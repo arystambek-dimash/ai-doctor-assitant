@@ -62,4 +62,4 @@ class AppContainer(containers.DeclarativeContainer):
     medical_record_repository = providers.Factory(MedicalRecordRepository, session=session)
     appointment_repository = providers.Factory(AppointmentRepository, session=session)
     ai_consultation_repository = providers.Factory(AIConsultationRepository, session=session)
-    openai_service = providers.Factory(OpenAIService, session=session)
+    openai_service = providers.Factory(OpenAIService, api_key=settings.provided.OPENAI_API_KEY)

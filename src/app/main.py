@@ -7,6 +7,8 @@ from fastapi.responses import JSONResponse
 from src.app.container import AppContainer
 from src.domain.errors import BaseError
 from src.presentation.api.admin.doctors import router as admin_doctors_router
+from src.presentation.api.admin.stats import router as admin_stats_router
+from src.presentation.api.admin.users import router as admin_users_router
 from src.presentation.api.routers.ai_consultations import router as ai_consultations_router
 from src.presentation.api.routers.appointments import router as appointments_router
 from src.presentation.api.routers.doctors import router as doctors_router
@@ -52,6 +54,8 @@ def create_app() -> FastAPI:
     v1_router.include_router(websocket_chat_router)
     v1_router.include_router(ai_consultations_router)
     v1_router.include_router(admin_doctors_router)
+    v1_router.include_router(admin_users_router)
+    v1_router.include_router(admin_stats_router)
     app.include_router(v1_router)
     return app
 

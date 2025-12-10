@@ -26,6 +26,7 @@ from src.use_cases.handlers.ai_chat_handler import AIChatHandler, AIChatStartHan
 from src.use_cases.medical_records.use_case import MedicalRecordUseCase
 from src.use_cases.schedules.use_case import ScheduleUseCase
 from src.use_cases.specializations.use_case import SpecializationUseCase
+from src.use_cases.stats.use_case import StatsUseCase
 from src.use_cases.users.use_case import UserUseCase
 
 http_bearer = HTTPBearer()
@@ -161,6 +162,23 @@ async def get_ai_chat_start_handler(
         consultation_repo=consultation_repo,
         openai_service=openai_service,
         jwt_service=jwt_service,
+    )
+
+
+@inject
+async def get_stats_use_case(
+        uow: IUoW = Depends(Provide[AppContainer.uow]),
+        user_repository: IUserRepository = Depends(Provide[AppContainer.user_repository]),
+        doctor_repository: IDoctorRepository = Depends(Provide[AppContainer.doc_repository]),
+        appointment_repository: IAppointmentRepository = Depends(Provide[AppContainer.appointment_repository]),
+        medical_record_repository: IMedicalRecordRepository = Depends(Provide[AppContainer.medical_record_repository]),
+) -> StatsUseCase:
+    return StatsUseCase(
+        uow=uow,
+        user_repository=user_repository,
+        doctor_repository=doctor_repository,
+        appointment_repository=appointment_repository,
+        medical_record_repository=medical_record_repository,
     )
 
 
