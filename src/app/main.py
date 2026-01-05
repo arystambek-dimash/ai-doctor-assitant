@@ -3,6 +3,7 @@ from urllib.request import Request
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from src.app.container import AppContainer
 from src.domain.errors import BaseError
@@ -17,6 +18,8 @@ from src.presentation.api.routers.schedules import router as schedules_router
 from src.presentation.api.routers.specializations import router as specializations_router
 from src.presentation.api.routers.users import router as users_router
 from src.presentation.api.routers.websocket_chat import router as websocket_chat_router
+
+_engine: AsyncEngine | None = None
 
 
 def create_app() -> FastAPI:
@@ -39,10 +42,13 @@ def create_app() -> FastAPI:
     @app.on_event("startup")
     async def startup():
         await container.init_resources()
+        global _engine
 
     @app.on_event("shutdown")
     async def shutdown():
         await container.shutdown_resources()
+        global _engine
+        _engine = None
 
     v1_router = APIRouter(prefix="/api/v1")
     v1_router.include_router(users_router)
@@ -57,6 +63,7 @@ def create_app() -> FastAPI:
     v1_router.include_router(admin_users_router)
     v1_router.include_router(admin_stats_router)
     app.include_router(v1_router)
+
     return app
 
 

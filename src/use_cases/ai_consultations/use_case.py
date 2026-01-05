@@ -45,7 +45,6 @@ class AIConsultationUseCase:
     async def send_message_stream(
             self, consultation_id: int, content: str, user_id: int
     ) -> AsyncGenerator[str, None]:
-        # Validate access within UoW context
         async with self._uow:
             consultation = await self._consultation_repo.get_consultation_by_id(consultation_id)
             if not consultation:
@@ -54,31 +53,27 @@ class AIConsultationUseCase:
             if consultation.patient_id != user_id:
                 raise ForbiddenException("Access denied")
 
-            # Add user message
             await self._consultation_repo.add_message(consultation_id, "user", content)
 
-            # Get all messages for the chat
             messages = await self._consultation_repo.get_messages_by_consultation_id(consultation_id)
             chat_messages = [{"role": m.role, "content": m.content} for m in messages]
 
-        # Stream response (outside UoW)
+            doctors = await self._doctor_repo.get_all_doctors(limit=50)
+
         full_response = ""
-        async for chunk in self._openai_service.chat_stream(chat_messages):
+        async for chunk in self._openai_service.chat_stream(chat_messages, doctors=doctors):
             full_response += chunk
             yield chunk
 
-        # Save assistant response within UoW context
         async with self._uow:
             await self._consultation_repo.add_message(consultation_id, "assistant", full_response)
 
-        # Process recommendation if present
         if "```json" in full_response:
             await self._process_recommendation(consultation_id, full_response)
 
     async def send_message(
             self, consultation_id: int, content: str, user_id: int
     ) -> ChatMessageEntity:
-        # Validate access and add user message within UoW context
         async with self._uow:
             consultation = await self._consultation_repo.get_consultation_by_id(consultation_id)
             if not consultation:
@@ -89,20 +84,18 @@ class AIConsultationUseCase:
 
             await self._consultation_repo.add_message(consultation_id, "user", content)
 
-            # Get all messages for the chat
             messages = await self._consultation_repo.get_messages_by_consultation_id(consultation_id)
             chat_messages = [{"role": m.role, "content": m.content} for m in messages]
 
-        # Get AI response (outside UoW)
-        response = await self._openai_service.chat(chat_messages)
+            doctors = await self._doctor_repo.get_all_doctors(limit=50)
 
-        # Save assistant response within UoW context
+        response = await self._openai_service.chat(chat_messages, doctors=doctors)
+
         async with self._uow:
             message = await self._consultation_repo.add_message(
                 consultation_id, "assistant", response
             )
 
-        # Process recommendation if present
         if "```json" in response:
             await self._process_recommendation(consultation_id, response)
 
@@ -130,7 +123,6 @@ class AIConsultationUseCase:
     async def complete_consultation(
             self, consultation_id: int, user_id: int
     ) -> dict:
-        # Validate access and get messages within UoW context
         async with self._uow:
             consultation = await self._consultation_repo.get_consultation_by_id(consultation_id)
             if not consultation:
