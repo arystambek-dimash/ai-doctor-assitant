@@ -63,7 +63,6 @@ async def create_user(
         use_case: UserUseCase = Depends(get_user_use_case),
         current_user: UserEntity = Depends(requires_roles(is_admin=True)),
 ):
-    """Create a new user (admin only)"""
     return await use_case.register(
         CreateUserDTO(
             email=request.email.__str__(),
