@@ -3,6 +3,7 @@ from urllib.request import Request
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from src.app.container import AppContainer
@@ -43,6 +44,22 @@ def create_app() -> FastAPI:
     async def startup():
         await container.init_resources()
         global _engine
+        _engine = container.engine()
+        password_hash = container.password_service()
+        async with _engine.begin() as connection:
+            await connection.execute(
+                text("""
+               INSERT INTO users (email, password_hash, full_name, is_admin, created_at, updated_at)
+                VALUES (:email, :password_hash, :full_name, TRUE, NOW(), NOW())
+                ON CONFLICT (email) DO NOTHING
+                    
+                """),
+                {
+                    "email": container.settings().SUPER_ADMIN_LOGIN,
+                    "password_hash": str(password_hash.encrypt(container.settings().SUPER_ADMIN_PASSWORD)),
+                    "full_name": "Admin",
+                }
+            )
 
     @app.on_event("shutdown")
     async def shutdown():

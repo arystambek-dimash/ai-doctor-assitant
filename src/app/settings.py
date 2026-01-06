@@ -17,6 +17,9 @@ class Settings(BaseSettings):
 
     OPENAI_API_KEY: str
 
+    SUPER_ADMIN_LOGIN: str
+    SUPER_ADMIN_PASSWORD: str
+
     @property
     def db_url(self) -> str:
         return "postgresql+asyncpg://{}:{}@{}:{}/{}".format(

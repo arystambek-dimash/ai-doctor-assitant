@@ -7,7 +7,7 @@ class UserResponse(BaseModel):
     id: int
     email: str
     full_name: str
-    phone: str
+    phone: Optional[str] = None
     is_admin: bool
     is_doctor: Optional[bool] = None
     doctor_id: Optional[int] = None
