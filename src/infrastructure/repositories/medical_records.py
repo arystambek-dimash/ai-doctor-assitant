@@ -1,4 +1,6 @@
-from sqlalchemy import insert, select, update, delete, func
+from typing import Optional
+
+from sqlalchemy import insert, select, update, delete, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -6,6 +8,7 @@ from src.domain.entities.medical_records import MedicalRecordEntity, MedicalReco
 from src.domain.interfaces.medical_record_repositories import IMedicalRecordRepository
 from src.infrastructure.database.models.doctors import Doctor
 from src.infrastructure.database.models.medical_records import MedicalRecord
+from src.infrastructure.database.models.users import User
 from src.use_cases.medical_records.dto import CreateMedicalRecordDTO, UpdateMedicalRecordDTO
 
 
@@ -82,20 +85,33 @@ class MedicalRecordRepository(IMedicalRecordRepository):
         return [self._from_orm_with_details(obj) for obj in objects]
 
     async def get_medical_records_by_doctor_id(
-            self, doctor_id: int, skip: int = 0, limit: int = 20
+            self,
+            doctor_id: int,
+            search: Optional[str] = None,
+            skip: int = 0,
+            limit: int = 20
     ) -> list[MedicalRecordWithDetailsEntity]:
         stmt = (
             select(MedicalRecord)
+            .join(MedicalRecord.patient)
             .options(
                 joinedload(MedicalRecord.patient),
                 joinedload(MedicalRecord.doctor).joinedload(Doctor.user),
                 joinedload(MedicalRecord.doctor).joinedload(Doctor.specialization),
             )
             .where(MedicalRecord.doctor_id == doctor_id)
-            .order_by(MedicalRecord.created_at.desc())
-            .offset(skip)
-            .limit(limit)
         )
+
+        if search:
+            search_pattern = f"%{search}%"
+            stmt = stmt.where(
+                or_(
+                    User.full_name.ilike(search_pattern),
+                    MedicalRecord.diagnosis.ilike(search_pattern),
+                )
+            )
+
+        stmt = stmt.order_by(MedicalRecord.created_at.desc()).offset(skip).limit(limit)
         result = await self._session.execute(stmt)
         objects = result.scalars().unique().all()
         return [self._from_orm_with_details(obj) for obj in objects]
@@ -149,5 +165,5 @@ class MedicalRecordRepository(IMedicalRecordRepository):
             patient_name=obj.patient.full_name,
             patient_email=obj.patient.email,
             doctor_name=obj.doctor.user.full_name,
-            specialization_name=obj.doctor.specialization.name,
+            specialization_name=obj.doctor.specialization.title,
         )

@@ -3,11 +3,11 @@ from datetime import time
 import sqlalchemy as sa
 import sqlalchemy.orm as orm
 
-from . import IdMixin
+from . import IdMixin, TimeStampMixin
 from ..core import Base
 
 
-class Schedule(Base, IdMixin):
+class Schedule(Base, IdMixin, TimeStampMixin):
     __tablename__ = "schedules"
 
     day_of_week: orm.Mapped[int] = orm.mapped_column(sa.Integer)  # 0=Monday, 6=Sunday

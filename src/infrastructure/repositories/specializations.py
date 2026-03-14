@@ -2,7 +2,7 @@ from sqlalchemy import insert, select, update, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.entities.specializations import SpecializationEntity, SpecializationWithCountEntity
-from src.domain.interfaces.speicailization_repository import ISpecializationRepository
+from src.domain.interfaces.specialization_repository import ISpecializationRepository
 from src.infrastructure.database.models.doctors import Doctor
 from src.infrastructure.database.models.specializations import Specialization
 from src.use_cases.specializations.dto import CreateSpecializationDTO, UpdateSpecializationDTO
@@ -73,6 +73,7 @@ class SpecializationRepository(ISpecializationRepository):
             SpecializationWithCountEntity(
                 id=row.Specialization.id,
                 title=row.Specialization.title,
+                slug=row.Specialization.slug,
                 description=row.Specialization.description,
                 doctors_count=row.doctors_count,
             )
@@ -89,5 +90,6 @@ class SpecializationRepository(ISpecializationRepository):
         return SpecializationEntity(
             id=obj.id,
             title=obj.title,
+            slug=obj.slug,
             description=obj.description,
         )

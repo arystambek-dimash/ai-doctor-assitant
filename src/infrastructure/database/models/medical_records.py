@@ -24,7 +24,6 @@ class MedicalRecord(Base, IdMixin, TimeStampMixin):
         nullable=True,
         unique=True
     )
-
     patient = orm.relationship("User", back_populates="medical_records")
     doctor = orm.relationship("Doctor")
     appointment = orm.relationship(

@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from src.domain.entities.users import UserEntity, UserEntityWithDetails
+from src.infrastructure.database.models.doctors import Doctor
 from src.infrastructure.database.models.users import User
 from src.use_cases.users.dto import CreateUserDTO, UpdateUserDTO
 
@@ -74,10 +75,11 @@ class UserRepository:
         return [self._from_orm(user) for user in users]
 
     async def get_all_patients(self, skip: int = 0, limit: int = 20) -> List[UserEntity]:
+        doctor_subquery = select(Doctor.user_id).where(Doctor.user_id == User.id).exists()
         stmt = (
             select(User)
             .where(User.is_admin == False)
-            .where(User.is_doctor == False)
+            .where(~doctor_subquery)
             .offset(skip)
             .limit(limit)
         )
