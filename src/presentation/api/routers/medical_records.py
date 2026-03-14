@@ -2,7 +2,8 @@ from typing import List
 
 from fastapi import APIRouter, Depends, Query, status
 
-from src.domain.entities.users import UserEntity
+from src.domain.entities.users import UserEntity, UserEntityWithDetails
+from src.domain.errors import BadRequestException
 from src.presentation.api.schemas.requests.medical_records import MedicalRecordCreateRequest, MedicalRecordUpdateRequest
 from src.presentation.api.schemas.responses.medical_records import MedicalRecordResponse, \
     MedicalRecordWithDetailsResponse
@@ -21,14 +22,18 @@ router = APIRouter(prefix="/medical-records", tags=["Medical Records"])
 async def create_medical_record(
         request: MedicalRecordCreateRequest,
         use_case: MedicalRecordUseCase = Depends(get_medical_record_use_case),
-        current_user: UserEntity = Depends(requires_roles(is_doctor=True)),
+        current_user: UserEntityWithDetails = Depends(requires_roles(is_doctor=True)),
 ):
+    if not current_user.doctor_id:
+        raise BadRequestException("Doctor profile not found. Please ensure your doctor registration is approved.")
+
     return await use_case.create_medical_record(
         CreateMedicalRecordDTO(
             diagnosis=request.diagnosis,
             prescription=request.prescription,
             notes=request.notes,
             patient_id=request.patient_id,
+            doctor_id=current_user.doctor_id,
             appointment_id=request.appointment_id
         )
     )
@@ -44,8 +49,29 @@ async def get_my_medical_records(
         use_case: MedicalRecordUseCase = Depends(get_medical_record_use_case),
         current_user: UserEntity = Depends(get_current_user),
 ):
+    """Get medical records where current user is the patient."""
     return await use_case.get_my_medical_records(
         current_user.id, skip=skip, limit=limit
+    )
+
+
+@router.get(
+    "/doctor/me",
+    response_model=List[MedicalRecordWithDetailsResponse]
+)
+async def get_my_doctor_medical_records(
+        search: str = Query(None, description="Search by patient name or diagnosis"),
+        skip: int = Query(0, ge=0),
+        limit: int = Query(20, ge=1, le=100),
+        use_case: MedicalRecordUseCase = Depends(get_medical_record_use_case),
+        current_user: UserEntityWithDetails = Depends(requires_roles(is_doctor=True)),
+):
+    """Get medical records created by the current doctor."""
+    return await use_case.get_my_created_records(
+        doctor_id=current_user.doctor_id,
+        search=search,
+        skip=skip,
+        limit=limit,
     )
 
 

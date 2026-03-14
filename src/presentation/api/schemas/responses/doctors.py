@@ -61,3 +61,23 @@ class ApplicationStatusResponse(BaseModel):
     has_application: bool
     status: Optional[str] = None
     rejection_reason: Optional[str] = None
+
+
+class DoctorPatientResponse(BaseModel):
+    """Patient info as seen by a doctor."""
+    id: int
+    email: str
+    full_name: str
+    phone: Optional[str]
+    total_appointments: int
+    last_appointment_date: Optional[datetime]
+    upcoming_appointments: int
+
+    class Config:
+        from_attributes = True
+
+
+class DoctorPatientsStatsResponse(BaseModel):
+    """Stats about doctor's patients and appointments."""
+    total_patients: int
+    total_appointments: int

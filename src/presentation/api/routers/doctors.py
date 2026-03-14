@@ -1,3 +1,4 @@
+from datetime import date
 from typing import List
 
 from fastapi import APIRouter, Depends, Query, status
@@ -8,13 +9,22 @@ from src.presentation.api.schemas.requests.doctors import (
     DoctorRegisterRequest,
     DoctorUpdateRequest,
 )
+from src.presentation.api.schemas.responses.appointments import DoctorAvailabilityResponse
 from src.presentation.api.schemas.responses.doctors import (
     DoctorResponse,
     DoctorWithDetailsResponse,
     DoctorPublicResponse,
     ApplicationStatusResponse,
+    DoctorPatientResponse,
+    DoctorPatientsStatsResponse,
 )
-from src.presentation.dependencies import get_doctor_use_case, get_current_user, requires_roles
+from src.presentation.dependencies import (
+    get_doctor_use_case,
+    get_current_user,
+    requires_roles,
+    get_appointment_use_case,
+)
+from src.use_cases.appointments.use_case import AppointmentUseCase
 from src.use_cases.doctors.dto import (
     RegisterDoctorDTO,
     UpdateDoctorDTO,
@@ -65,6 +75,38 @@ async def get_application_status(
         use_case: DoctorUseCase = Depends(get_doctor_use_case),
 ):
     return await use_case.get_my_application_status(current_user.id)
+
+
+@router.get(
+    "/me/patients",
+    response_model=List[DoctorPatientResponse],
+)
+async def get_my_patients(
+        search: str = Query(None, description="Search by name, email or phone"),
+        skip: int = Query(0, ge=0),
+        limit: int = Query(20, ge=1, le=100),
+        current_user: UserEntity = Depends(requires_roles(is_doctor=True)),
+        use_case: DoctorUseCase = Depends(get_doctor_use_case),
+):
+    """Get all patients who have appointments with the current doctor."""
+    return await use_case.get_my_patients(
+        user_id=current_user.id,
+        search=search,
+        skip=skip,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/me/patients/stats",
+    response_model=DoctorPatientsStatsResponse,
+)
+async def get_my_patients_stats(
+        current_user: UserEntity = Depends(requires_roles(is_doctor=True)),
+        use_case: DoctorUseCase = Depends(get_doctor_use_case),
+):
+    """Get total patients and appointments count for the current doctor."""
+    return await use_case.get_my_patients_stats(current_user.id)
 
 
 @router.delete(
@@ -122,3 +164,16 @@ async def update_doctor(
             specialization_id=request.specialization_id,
         )
     )
+
+
+@router.get(
+    "/{doctor_id}/availability",
+    response_model=DoctorAvailabilityResponse,
+)
+async def get_doctor_availability(
+        doctor_id: int,
+        target_date: date = Query(..., description="Date to check availability (YYYY-MM-DD)"),
+        appointment_use_case: AppointmentUseCase = Depends(get_appointment_use_case),
+):
+    """Get available time slots for a doctor on a specific date."""
+    return await appointment_use_case.get_doctor_availability(doctor_id, target_date)

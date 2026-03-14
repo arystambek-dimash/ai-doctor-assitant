@@ -5,7 +5,11 @@ from fastapi import APIRouter, Depends, Query, status
 
 from src.domain.constants import AppointmentStatus
 from src.domain.entities.users import UserEntityWithDetails
-from src.presentation.api.schemas.requests.appointments import AppointmentCreateRequest, AppointmentUpdateRequest
+from src.presentation.api.schemas.requests.appointments import (
+    AppointmentCreateRequest,
+    AppointmentUpdateRequest,
+    AdminAppointmentCreateRequest,
+)
 from src.presentation.api.schemas.responses.appointments import AppointmentResponse, AppointmentWithDetailsResponse
 from src.presentation.dependencies import get_current_user, get_appointment_use_case, requires_roles
 from src.use_cases.appointments.dto import CreateAppointmentDTO, UpdateAppointmentDTO
@@ -30,9 +34,30 @@ async def create_appointment(
             doctor_id=request.doctor_id,
             patient_id=current_user.id,
             notes=request.notes,
-            ai_consultation_id=request.ai_consultation_id,
+            triage_run_id=request.triage_run_id,
         ),
         current_user.id
+    )
+
+
+@router.post(
+    "/admin/create",
+    response_model=AppointmentResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def admin_create_appointment(
+        request: AdminAppointmentCreateRequest,
+        current_user: UserEntityWithDetails = Depends(requires_roles(is_admin=True)),
+        use_case: AppointmentUseCase = Depends(get_appointment_use_case),
+):
+    """Admin endpoint to create appointments for any patient."""
+    return await use_case.admin_create_appointment(
+        CreateAppointmentDTO(
+            date_time=request.date_time,
+            doctor_id=request.doctor_id,
+            patient_id=request.patient_id,
+            notes=request.notes,
+        )
     )
 
 
@@ -73,6 +98,73 @@ async def get_my_doctor_appointments(
         skip=skip,
         limit=limit,
     )
+
+
+@router.get(
+    "/doctor/me/stats",
+)
+async def get_my_doctor_appointments_stats(
+        target_date: date | None = Query(None, alias="date"),
+        current_user: UserEntityWithDetails = Depends(requires_roles(is_doctor=True)),
+        use_case: AppointmentUseCase = Depends(get_appointment_use_case),
+):
+    """Get appointment statistics for the logged-in doctor."""
+    return await use_case.get_my_doctor_appointments_stats(
+        current_user.id,
+        target_date=target_date,
+    )
+
+
+@router.post(
+    "/{appointment_id}/confirm",
+    response_model=AppointmentResponse
+)
+async def confirm_appointment(
+        appointment_id: int,
+        current_user: UserEntityWithDetails = Depends(requires_roles(is_doctor=True)),
+        use_case: AppointmentUseCase = Depends(get_appointment_use_case),
+):
+    """Confirm a scheduled appointment (SCHEDULED → CONFIRMED)."""
+    return await use_case.confirm_appointment(appointment_id, current_user.id)
+
+
+@router.post(
+    "/{appointment_id}/start",
+    response_model=AppointmentResponse
+)
+async def start_appointment(
+        appointment_id: int,
+        current_user: UserEntityWithDetails = Depends(requires_roles(is_doctor=True)),
+        use_case: AppointmentUseCase = Depends(get_appointment_use_case),
+):
+    """Start an appointment (CONFIRMED → IN_PROGRESS)."""
+    return await use_case.start_appointment(appointment_id, current_user.id)
+
+
+@router.post(
+    "/{appointment_id}/complete",
+    response_model=AppointmentResponse
+)
+async def complete_appointment(
+        appointment_id: int,
+        current_user: UserEntityWithDetails = Depends(requires_roles(is_doctor=True)),
+        use_case: AppointmentUseCase = Depends(get_appointment_use_case),
+):
+    """Complete an appointment (IN_PROGRESS → COMPLETED)."""
+    return await use_case.complete_appointment(appointment_id, current_user.id)
+
+
+@router.post(
+    "/{appointment_id}/no-show",
+    response_model=AppointmentResponse
+)
+async def mark_no_show(
+        appointment_id: int,
+        current_user: UserEntityWithDetails = Depends(requires_roles(is_doctor=True)),
+        use_case: AppointmentUseCase = Depends(get_appointment_use_case),
+):
+    """Mark patient as no-show."""
+    return await use_case.mark_no_show(appointment_id, current_user.id)
 
 
 @router.get(

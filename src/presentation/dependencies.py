@@ -1,192 +1,170 @@
-from typing import Callable, Awaitable
+from typing import Callable, Awaitable, Optional, AsyncGenerator
 
 import jwt
 from dependency_injector.wiring import inject, Provide
 from fastapi import Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.app.container import AppContainer
 from src.domain.entities.users import UserEntityWithDetails
 from src.domain.errors import UnauthorizedException
-from src.domain.interfaces.ai_consultation_repository import IAIConsultationRepository
-from src.domain.interfaces.appointment_repository import IAppointmentRepository
-from src.domain.interfaces.doctor_repository import IDoctorRepository
-from src.domain.interfaces.medical_record_repositories import IMedicalRecordRepository
-from src.domain.interfaces.schedule_repository import IScheduleRepository
-from src.domain.interfaces.speicailization_repository import ISpecializationRepository
-from src.domain.interfaces.uow import IUoW
-from src.domain.interfaces.user_repository import IUserRepository
+from src.infrastructure.database.uow import UoW
+from src.infrastructure.repositories.appointments import AppointmentRepository
+from src.infrastructure.repositories.chat_messages import ChatMessageRepository
+from src.infrastructure.repositories.chat_sessions import ChatSessionRepository
+from src.infrastructure.repositories.doctors import DoctorRepository
+from src.infrastructure.repositories.medical_records import MedicalRecordRepository
+from src.infrastructure.repositories.schedules import ScheduleRepository
+from src.infrastructure.repositories.specializations import SpecializationRepository
+from src.infrastructure.repositories.triage_candidates import TriageCandidateRepository
+from src.infrastructure.repositories.triage_runs import TriageRunRepository
+from src.infrastructure.repositories.users import UserRepository
 from src.infrastructure.services.jwt_service import JWTService
 from src.infrastructure.services.openai_service import OpenAIService
 from src.infrastructure.services.password_service import PasswordService
-from src.use_cases.ai_consultations.use_case import AIConsultationUseCase
 from src.use_cases.appointments.use_case import AppointmentUseCase
+from src.use_cases.chat.use_case import ChatUseCase
 from src.use_cases.doctors.use_case import DoctorUseCase
-from src.use_cases.handlers.ai_chat_handler import AIChatHandler, AIChatStartHandler
 from src.use_cases.medical_records.use_case import MedicalRecordUseCase
 from src.use_cases.schedules.use_case import ScheduleUseCase
 from src.use_cases.specializations.use_case import SpecializationUseCase
 from src.use_cases.stats.use_case import StatsUseCase
+from src.use_cases.triage.use_case import TriageUseCase
 from src.use_cases.users.use_case import UserUseCase
 
 http_bearer = HTTPBearer()
+http_bearer_optional = HTTPBearer(auto_error=False)
+
+
+@inject
+async def get_db_session(
+        session_factory: async_sessionmaker = Depends(Provide[AppContainer.session_factory]),
+) -> AsyncGenerator[AsyncSession, None]:
+    """Create a fresh database session per request with proper cleanup."""
+    async with session_factory() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
 
 
 @inject
 async def get_user_use_case(
-        uow: IUoW = Depends(Provide[AppContainer.uow]),
-        user_repository: IUserRepository = Depends(Provide[AppContainer.user_repository]),
+        session: AsyncSession = Depends(get_db_session),
         jwt_service: JWTService = Depends(Provide[AppContainer.jwt_service]),
         password_service: PasswordService = Depends(Provide[AppContainer.password_service])
 ) -> UserUseCase:
     return UserUseCase(
-        uow=uow,
-        user_repository=user_repository,
+        uow=UoW(session),
+        user_repository=UserRepository(session),
         jwt_service=jwt_service,
         password_service=password_service,
     )
 
 
-@inject
 async def get_doctor_use_case(
-        uow: IUoW = Depends(Provide[AppContainer.uow]),
-        doctor_repository: IDoctorRepository = Depends(Provide[AppContainer.doc_repository]),
-        user_repository: IUserRepository = Depends(Provide[AppContainer.user_repository]),
-        specialization_repository: ISpecializationRepository = Depends(Provide[AppContainer.specialization_repository]),
+        session: AsyncSession = Depends(get_db_session),
 ) -> DoctorUseCase:
     return DoctorUseCase(
-        uow=uow,
-        doctor_repository=doctor_repository,
-        user_repository=user_repository,
-        specialization_repository=specialization_repository,
+        uow=UoW(session),
+        doctor_repository=DoctorRepository(session),
+        user_repository=UserRepository(session),
+        specialization_repository=SpecializationRepository(session),
+        appointment_repository=AppointmentRepository(session),
     )
 
 
-@inject
 async def get_specialization_use_case(
-        uow: IUoW = Depends(Provide[AppContainer.uow]),
-        specialization_repository: ISpecializationRepository = Depends(Provide[AppContainer.specialization_repository]),
+        session: AsyncSession = Depends(get_db_session),
 ) -> SpecializationUseCase:
     return SpecializationUseCase(
-        uow=uow,
-        specialization_repository=specialization_repository,
+        uow=UoW(session),
+        specialization_repository=SpecializationRepository(session),
     )
 
 
-@inject
 async def get_schedule_use_case(
-        uow: IUoW = Depends(Provide[AppContainer.uow]),
-        schedule_repository: IScheduleRepository = Depends(Provide[AppContainer.schedule_repository]),
-        doctor_repository: IDoctorRepository = Depends(Provide[AppContainer.doc_repository]),
+        session: AsyncSession = Depends(get_db_session),
 ) -> ScheduleUseCase:
     return ScheduleUseCase(
-        uow=uow,
-        schedule_repository=schedule_repository,
-        doctor_repository=doctor_repository,
+        uow=UoW(session),
+        schedule_repository=ScheduleRepository(session),
+        doctor_repository=DoctorRepository(session),
+        appointment_repository=AppointmentRepository(session),
     )
 
 
-@inject
 async def get_medical_record_use_case(
-        uow: IUoW = Depends(Provide[AppContainer.uow]),
-        medical_record_repository: IMedicalRecordRepository = Depends(Provide[AppContainer.medical_record_repository]),
-        doctor_repository: IDoctorRepository = Depends(Provide[AppContainer.doc_repository]),
+        session: AsyncSession = Depends(get_db_session),
 ) -> MedicalRecordUseCase:
     return MedicalRecordUseCase(
-        uow=uow,
-        medical_record_repository=medical_record_repository,
-        doctor_repository=doctor_repository,
+        uow=UoW(session),
+        medical_record_repository=MedicalRecordRepository(session),
+        doctor_repository=DoctorRepository(session),
     )
 
 
-@inject
 async def get_appointment_use_case(
-        uow: IUoW = Depends(Provide[AppContainer.uow]),
-        appointment_repository: IAppointmentRepository = Depends(Provide[AppContainer.appointment_repository]),
-        doctor_repository: IDoctorRepository = Depends(Provide[AppContainer.doc_repository]),
-        schedule_repository: IScheduleRepository = Depends(Provide[AppContainer.schedule_repository]),
+        session: AsyncSession = Depends(get_db_session),
 ) -> AppointmentUseCase:
     return AppointmentUseCase(
-        uow=uow,
-        appointment_repository=appointment_repository,
-        doctor_repository=doctor_repository,
-        schedule_repository=schedule_repository,
+        uow=UoW(session),
+        appointment_repository=AppointmentRepository(session),
+        doctor_repository=DoctorRepository(session),
+        schedule_repository=ScheduleRepository(session),
     )
 
 
-@inject
-async def get_ai_consultation_use_case(
-        uow: IUoW = Depends(Provide[AppContainer.uow]),
-        consultation_repository: IAIConsultationRepository = Depends(Provide[AppContainer.ai_consultation_repository]),
-        doctor_repository: IDoctorRepository = Depends(Provide[AppContainer.doc_repository]),
-        specialization_repository: ISpecializationRepository = Depends(Provide[AppContainer.specialization_repository]),
-        openai_service: OpenAIService = Depends(Provide[AppContainer.openai_service]),
-) -> AIConsultationUseCase:
-    return AIConsultationUseCase(
-        uow=uow,
-        consultation_repository=consultation_repository,
-        doctor_repository=doctor_repository,
-        specialization_repository=specialization_repository,
-        openai_service=openai_service,
+async def get_chat_use_case(
+        session: AsyncSession = Depends(get_db_session),
+) -> ChatUseCase:
+    return ChatUseCase(
+        uow=UoW(session),
+        chat_session_repository=ChatSessionRepository(session),
+        chat_message_repository=ChatMessageRepository(session),
     )
 
 
-@inject
-async def get_ai_chat_handler(
-        uow: IUoW = Depends(Provide[AppContainer.uow]),
-        consultation_repo: IAIConsultationRepository = Depends(Provide[AppContainer.ai_consultation_repository]),
-        doctor_repo: IDoctorRepository = Depends(Provide[AppContainer.doc_repository]),
-        specialization_repo: ISpecializationRepository = Depends(Provide[AppContainer.specialization_repository]),
-        openai_service: OpenAIService = Depends(Provide[AppContainer.openai_service]),
-        jwt_service: JWTService = Depends(Provide[AppContainer.jwt_service]),
-) -> AIChatHandler:
-    return AIChatHandler(
-        uow=uow,
-        consultation_repo=consultation_repo,
-        doctor_repo=doctor_repo,
-        specialization_repo=specialization_repo,
-        openai_service=openai_service,
-        jwt_service=jwt_service,
+async def get_triage_use_case(
+        session: AsyncSession = Depends(get_db_session),
+) -> TriageUseCase:
+    return TriageUseCase(
+        uow=UoW(session),
+        triage_run_repository=TriageRunRepository(session),
+        triage_candidate_repository=TriageCandidateRepository(session),
+        chat_session_repository=ChatSessionRepository(session),
+        doctor_repository=DoctorRepository(session),
+        specialization_repository=SpecializationRepository(session),
     )
 
 
-@inject
-async def get_ai_chat_start_handler(
-        uow: IUoW = Depends(Provide[AppContainer.uow]),
-        consultation_repo: IAIConsultationRepository = Depends(Provide[AppContainer.ai_consultation_repository]),
-        openai_service: OpenAIService = Depends(Provide[AppContainer.openai_service]),
-        jwt_service: JWTService = Depends(Provide[AppContainer.jwt_service]),
-) -> AIChatStartHandler:
-    return AIChatStartHandler(
-        uow=uow,
-        consultation_repo=consultation_repo,
-        openai_service=openai_service,
-        jwt_service=jwt_service,
-    )
-
-
-@inject
 async def get_stats_use_case(
-        uow: IUoW = Depends(Provide[AppContainer.uow]),
-        user_repository: IUserRepository = Depends(Provide[AppContainer.user_repository]),
-        doctor_repository: IDoctorRepository = Depends(Provide[AppContainer.doc_repository]),
-        appointment_repository: IAppointmentRepository = Depends(Provide[AppContainer.appointment_repository]),
-        medical_record_repository: IMedicalRecordRepository = Depends(Provide[AppContainer.medical_record_repository]),
+        session: AsyncSession = Depends(get_db_session),
 ) -> StatsUseCase:
     return StatsUseCase(
-        uow=uow,
-        user_repository=user_repository,
-        doctor_repository=doctor_repository,
-        appointment_repository=appointment_repository,
-        medical_record_repository=medical_record_repository,
+        uow=UoW(session),
+        user_repository=UserRepository(session),
+        doctor_repository=DoctorRepository(session),
+        appointment_repository=AppointmentRepository(session),
+        medical_record_repository=MedicalRecordRepository(session),
     )
+
+
+@inject
+def get_openai_service(
+        openai_service: OpenAIService = Depends(Provide[AppContainer.openai_service]),
+) -> OpenAIService:
+    return openai_service
 
 
 @inject
 async def get_current_user(
         credentials: HTTPAuthorizationCredentials | None = Depends(http_bearer),
+        session: AsyncSession = Depends(get_db_session),
         jwt_service: JWTService = Depends(Provide[AppContainer.jwt_service]),
-        user_repository: IUserRepository = Depends(Provide[AppContainer.user_repository]),
 ) -> UserEntityWithDetails:
     if credentials is None or not credentials.credentials:
         raise UnauthorizedException("Token is required")
@@ -204,11 +182,36 @@ async def get_current_user(
     except (TypeError, ValueError):
         raise UnauthorizedException("Invalid token")
 
+    user_repository = UserRepository(session)
     user = await user_repository.get_user_with_details(user_id)
     if user is None:
         raise UnauthorizedException("Invalid token")
 
     return user
+
+
+@inject
+async def get_current_user_optional(
+        credentials: HTTPAuthorizationCredentials | None = Depends(http_bearer_optional),
+        session: AsyncSession = Depends(get_db_session),
+        jwt_service: JWTService = Depends(Provide[AppContainer.jwt_service]),
+) -> Optional[UserEntityWithDetails]:
+    if credentials is None or not credentials.credentials:
+        return None
+
+    try:
+        decoded = jwt_service.decode_access_token(credentials.credentials)
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+        return None
+
+    sub = decoded.get("sub")
+    try:
+        user_id = int(sub)
+    except (TypeError, ValueError):
+        return None
+
+    user_repository = UserRepository(session)
+    return await user_repository.get_user_with_details(user_id)
 
 
 def requires_roles(*, is_admin: bool = False, is_doctor: bool = False) -> Callable[
