@@ -1,6 +1,6 @@
 from src.domain.entities.specializations import SpecializationEntity, SpecializationWithCountEntity
 from src.domain.errors import BadRequestException, NotFoundException
-from src.domain.interfaces.speicailization_repository import ISpecializationRepository
+from src.domain.interfaces.specialization_repository import ISpecializationRepository
 from src.domain.interfaces.uow import IUoW
 from src.use_cases.specializations.dto import CreateSpecializationDTO, UpdateSpecializationDTO
 

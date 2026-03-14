@@ -1,4 +1,4 @@
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from typing import List
 
 from src.domain.constants import AppointmentStatus
@@ -31,6 +31,29 @@ class AppointmentUseCase:
         if appointment.patient_id != user_id:
             raise ForbiddenException("Cannot book appointment for another user")
 
+        if appointment.date_time.replace(tzinfo=None) <= datetime.now():
+            raise BadRequestException("Cannot book appointment in the past")
+
+        doctor = await self._doctor_repo.get_doctor_by_id(appointment.doctor_id)
+        if not doctor:
+            raise NotFoundException("Doctor not found")
+
+        await self._validate_appointment_slot(appointment.doctor_id, appointment.date_time)
+
+        is_available = await self._appointment_repo.check_slot_availability(
+            appointment.doctor_id, appointment.date_time
+        )
+        if not is_available:
+            raise BadRequestException("This time slot is already booked")
+
+        async with self._uow:
+            created = await self._appointment_repo.create_appointment(appointment)
+        return created
+
+    async def admin_create_appointment(
+            self, appointment: CreateAppointmentDTO
+    ) -> AppointmentEntity:
+        """Admin can create appointments for any patient without restrictions."""
         if appointment.date_time.replace(tzinfo=None) <= datetime.now():
             raise BadRequestException("Cannot book appointment in the past")
 
@@ -174,14 +197,173 @@ class AppointmentUseCase:
             skip: int = 0,
             limit: int = 20,
     ) -> List[AppointmentWithDetailsEntity]:
+        # Get doctor by user_id first
+        doctor = await self._doctor_repo.get_doctor_by_user_id(user_id)
+        if not doctor:
+            return []
+
         return await self._appointment_repo.get_appointments_by_doctor_id(
-            user_id,
+            doctor.id,
             status=status,
             date_from=date_from,
             date_to=date_to,
             skip=skip,
             limit=limit,
         )
+
+    async def get_my_doctor_appointments_stats(
+            self,
+            user_id: int,
+            target_date: date | None = None,
+    ) -> dict:
+        """Get appointment statistics for a doctor."""
+        doctor = await self._doctor_repo.get_doctor_by_user_id(user_id)
+        if not doctor:
+            return {"total": 0, "active": 0, "done": 0, "scheduled": 0, "cancelled": 0}
+
+        # Get appointments for the date (or all if no date specified)
+        date_from = target_date if target_date else None
+        date_to = target_date if target_date else None
+
+        appointments = await self._appointment_repo.get_appointments_by_doctor_id(
+            doctor.id,
+            date_from=date_from,
+            date_to=date_to,
+            skip=0,
+            limit=1000,
+        )
+
+        total = len(appointments)
+        scheduled = sum(1 for a in appointments if a.status == AppointmentStatus.SCHEDULED)
+        confirmed = sum(1 for a in appointments if a.status == AppointmentStatus.CONFIRMED)
+        in_progress = sum(1 for a in appointments if a.status == AppointmentStatus.IN_PROGRESS)
+        completed = sum(1 for a in appointments if a.status == AppointmentStatus.COMPLETED)
+        cancelled = sum(1 for a in appointments if a.status == AppointmentStatus.CANCELLED)
+        no_show = sum(1 for a in appointments if a.status == AppointmentStatus.NO_SHOW)
+
+        return {
+            "total": total,
+            "active": scheduled + confirmed + in_progress,
+            "done": completed,
+            "scheduled": scheduled,
+            "confirmed": confirmed,
+            "in_progress": in_progress,
+            "completed": completed,
+            "cancelled": cancelled,
+            "no_show": no_show,
+        }
+
+    async def confirm_appointment(self, appointment_id: int, user_id: int) -> AppointmentEntity:
+        """Confirm a scheduled appointment (SCHEDULED → CONFIRMED)."""
+        return await self._change_appointment_status(
+            appointment_id, user_id,
+            allowed_statuses=[AppointmentStatus.SCHEDULED],
+            new_status=AppointmentStatus.CONFIRMED
+        )
+
+    async def start_appointment(self, appointment_id: int, user_id: int) -> AppointmentEntity:
+        """Start an appointment (CONFIRMED/SCHEDULED → IN_PROGRESS)."""
+        return await self._change_appointment_status(
+            appointment_id, user_id,
+            allowed_statuses=[AppointmentStatus.CONFIRMED, AppointmentStatus.SCHEDULED],
+            new_status=AppointmentStatus.IN_PROGRESS
+        )
+
+    async def complete_appointment(self, appointment_id: int, user_id: int) -> AppointmentEntity:
+        """Complete an appointment (IN_PROGRESS → COMPLETED)."""
+        return await self._change_appointment_status(
+            appointment_id, user_id,
+            allowed_statuses=[AppointmentStatus.IN_PROGRESS, AppointmentStatus.CONFIRMED],
+            new_status=AppointmentStatus.COMPLETED
+        )
+
+    async def mark_no_show(self, appointment_id: int, user_id: int) -> AppointmentEntity:
+        """Mark patient as no-show (SCHEDULED/CONFIRMED → NO_SHOW)."""
+        return await self._change_appointment_status(
+            appointment_id, user_id,
+            allowed_statuses=[AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED],
+            new_status=AppointmentStatus.NO_SHOW
+        )
+
+    async def _change_appointment_status(
+            self,
+            appointment_id: int,
+            user_id: int,
+            allowed_statuses: List[AppointmentStatus],
+            new_status: AppointmentStatus
+    ) -> AppointmentEntity:
+        """Helper to change appointment status with validation."""
+        existing = await self._appointment_repo.get_appointment_by_id(appointment_id)
+        if not existing:
+            raise NotFoundException("Appointment not found")
+
+        doctor = await self._doctor_repo.get_doctor_by_user_id(user_id)
+        if not doctor or doctor.id != existing.doctor_id:
+            raise ForbiddenException("Only the assigned doctor can change this appointment status")
+
+        if existing.status not in allowed_statuses:
+            raise BadRequestException(
+                f"Cannot change status from {existing.status.value} to {new_status.value}"
+            )
+
+        update_dto = UpdateAppointmentDTO(status=new_status)
+        async with self._uow:
+            updated = await self._appointment_repo.update_appointment(appointment_id, update_dto)
+        return updated
+
+    async def get_doctor_availability(
+        self, doctor_id: int, target_date: date
+    ) -> dict:
+        """Get available time slots for a doctor on a specific date."""
+        doctor = await self._doctor_repo.get_doctor_by_id(doctor_id)
+        if not doctor:
+            raise NotFoundException("Doctor not found")
+
+        day_of_week = target_date.weekday()
+        schedule = await self._schedule_repo.get_schedule_by_doctor_and_day(
+            doctor_id, day_of_week
+        )
+
+        if not schedule or not schedule.is_active:
+            return {
+                "doctor_id": doctor_id,
+                "date": target_date.isoformat(),
+                "slots": [],
+            }
+
+        booked_appointments = await self._appointment_repo.get_doctor_appointments_for_date(
+            doctor_id, target_date
+        )
+
+        booked_times = set()
+        for appt in booked_appointments:
+            slot_start = appt.date_time
+            slot_end = slot_start + timedelta(minutes=appt.duration_minutes)
+            current = slot_start
+            while current < slot_end:
+                booked_times.add(current)
+                current += timedelta(minutes=schedule.slot_duration_minutes)
+
+        slots = []
+        current_time = datetime.combine(target_date, schedule.start_time)
+        end_time = datetime.combine(target_date, schedule.end_time)
+        slot_duration = timedelta(minutes=schedule.slot_duration_minutes)
+
+        while current_time + slot_duration <= end_time:
+            is_available = current_time not in booked_times
+            if current_time > datetime.now():
+                slots.append({
+                    "start_time": current_time,
+                    "end_time": current_time + slot_duration,
+                    "is_available": is_available,
+                })
+            current_time += slot_duration
+
+        return {
+            "doctor_id": doctor_id,
+            "date": target_date.isoformat(),
+            "slots": slots,
+        }
 
     async def _validate_appointment_slot(self, doctor_id: int, date_time: datetime) -> None:
         day_of_week = date_time.weekday()

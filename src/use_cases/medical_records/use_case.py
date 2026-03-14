@@ -133,3 +133,15 @@ class MedicalRecordUseCase:
         return await self._medical_record_repo.get_medical_records_by_doctor_id(
             doctor_id, skip=skip, limit=limit
         )
+
+    async def get_my_created_records(
+            self,
+            doctor_id: int,
+            search: str = None,
+            skip: int = 0,
+            limit: int = 20,
+    ) -> List[MedicalRecordWithDetailsEntity]:
+        """Get medical records created by the doctor with optional search."""
+        return await self._medical_record_repo.get_medical_records_by_doctor_id(
+            doctor_id, search=search, skip=skip, limit=limit
+        )

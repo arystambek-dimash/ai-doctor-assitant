@@ -1,7 +1,8 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time as dt_time
 
 from src.domain.entities.schedules import ScheduleEntity, TimeSlotEntity
 from src.domain.errors import BadRequestException, NotFoundException, ForbiddenException
+from src.domain.interfaces.appointment_repository import IAppointmentRepository
 from src.domain.interfaces.doctor_repository import IDoctorRepository
 from src.domain.interfaces.schedule_repository import IScheduleRepository
 from src.domain.interfaces.uow import IUoW
@@ -24,10 +25,12 @@ class ScheduleUseCase:
             uow: IUoW,
             schedule_repository: IScheduleRepository,
             doctor_repository: IDoctorRepository,
+            appointment_repository: IAppointmentRepository,
     ):
         self._uow = uow
         self._schedule_repo = schedule_repository
         self._doctor_repo = doctor_repository
+        self._appointment_repo = appointment_repository
 
     async def create_schedule(self, schedule: CreateScheduleDTO) -> ScheduleEntity:
         existing = await self._schedule_repo.get_schedule_by_doctor_and_day(
@@ -87,18 +90,43 @@ class ScheduleUseCase:
         if not schedule or not schedule.is_active:
             return []
 
+        # Get booked appointments for this date
+        booked_appointments = await self._appointment_repo.get_doctor_appointments_for_date(
+            doctor_id, date
+        )
+
+        # Create a set of booked time ranges for faster lookup
+        booked_ranges = []
+        for appt in booked_appointments:
+            appt_start = appt.date_time
+            appt_end = appt_start + timedelta(minutes=appt.duration_minutes)
+            booked_ranges.append((appt_start, appt_end))
+
         slots = []
         current_time = datetime.combine(date, schedule.start_time)
         end_datetime = datetime.combine(date, schedule.end_time)
         slot_duration = timedelta(minutes=schedule.slot_duration_minutes)
+        now = datetime.now()
 
         while current_time + slot_duration <= end_datetime:
             slot_end = current_time + slot_duration
+
+            # Check if slot is in the past
+            is_past = current_time <= now
+
+            # Check if slot overlaps with any booked appointment
+            is_booked = False
+            for appt_start, appt_end in booked_ranges:
+                # Check for any overlap
+                if current_time < appt_end and slot_end > appt_start:
+                    is_booked = True
+                    break
+
             slots.append(
                 TimeSlotEntity(
                     start_time=current_time.time(),
                     end_time=slot_end.time(),
-                    is_available=True,  # TODO: Check against appointments
+                    is_available=not is_booked and not is_past,
                 )
             )
             current_time = slot_end

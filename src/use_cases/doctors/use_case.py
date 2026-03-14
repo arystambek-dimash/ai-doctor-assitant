@@ -2,9 +2,11 @@ from typing import Optional, List
 
 from src.domain.constants import DoctorStatus
 from src.domain.entities.doctors import DoctorEntity, DoctorWithDetailsEntity
+from src.domain.entities.users import DoctorPatientEntity
 from src.domain.errors import BadRequestException, NotFoundException
+from src.domain.interfaces.appointment_repository import IAppointmentRepository
 from src.domain.interfaces.doctor_repository import IDoctorRepository
-from src.domain.interfaces.speicailization_repository import ISpecializationRepository
+from src.domain.interfaces.specialization_repository import ISpecializationRepository
 from src.domain.interfaces.uow import IUoW
 from src.domain.interfaces.user_repository import IUserRepository
 from src.use_cases.doctors.dto import (
@@ -21,11 +23,13 @@ class DoctorUseCase:
             doctor_repository: IDoctorRepository,
             user_repository: IUserRepository,
             specialization_repository: ISpecializationRepository,
+            appointment_repository: Optional[IAppointmentRepository] = None,
     ):
         self._uow = uow
         self._doctor_repo = doctor_repository
         self._user_repo = user_repository
         self._specialization_repo = specialization_repository
+        self._appointment_repo = appointment_repository
 
     async def admin_create_doctor(
             self, dto: AdminCreateDoctorDTO
@@ -191,3 +195,38 @@ class DoctorUseCase:
             raise NotFoundException("Doctor not found")
         async with self._uow:
             return await self._doctor_repo.delete_doctor(doctor_id)
+
+    async def get_my_patients(
+            self,
+            user_id: int,
+            search: Optional[str] = None,
+            skip: int = 0,
+            limit: int = 20,
+    ) -> List[DoctorPatientEntity]:
+        """Get patients for the current doctor."""
+        doctor = await self._doctor_repo.get_doctor_by_user_id(user_id)
+        if not doctor:
+            raise NotFoundException("You don't have a doctor profile")
+        if doctor.status != DoctorStatus.APPROVED:
+            raise BadRequestException("Your doctor profile is not approved")
+
+        return await self._appointment_repo.get_doctor_patients(
+            doctor_id=doctor.id,
+            search=search,
+            skip=skip,
+            limit=limit,
+        )
+
+    async def get_my_patients_stats(self, user_id: int) -> dict:
+        """Get patient and appointment stats for the current doctor."""
+        doctor = await self._doctor_repo.get_doctor_by_user_id(user_id)
+        if not doctor:
+            raise NotFoundException("You don't have a doctor profile")
+
+        total_patients = await self._appointment_repo.count_doctor_patients(doctor.id)
+        total_appointments = await self._appointment_repo.count_doctor_appointments(doctor.id)
+
+        return {
+            "total_patients": total_patients,
+            "total_appointments": total_appointments,
+        }

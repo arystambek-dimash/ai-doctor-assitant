@@ -1,4 +1,7 @@
+import secrets
 from typing import List
+
+from starlette.requests import Request
 
 from src.domain.entities.users import UserEntity
 from src.domain.errors import BadRequestException, NotFoundException
@@ -77,3 +80,49 @@ class UserUseCase:
             if not user:
                 raise NotFoundException("User not found")
             await self._user_repo.delete_user(user_id)
+
+    async def google_callback(self, request: Request) -> dict:
+        try:
+            oauth = request.app.state.oauth
+
+            token = await oauth.google.authorize_access_token(request)
+            user_info = token.get("userinfo") or {}
+
+            email = user_info.get("email")
+            if not email:
+                raise BadRequestException("Email not provided by Google")
+
+            db_user = await self._user_repo.get_user_by_email(email)
+            if not db_user:
+                random_password = secrets.token_urlsafe(32)
+                full_name = user_info.get("name") or user_info.get("given_name", "User")
+
+                async with self._uow:
+                    db_user = await self._user_repo.create_user(
+                        CreateUserDTO(
+                            email=email,
+                            password_hash=self._password_service.encrypt(random_password),
+                            full_name=full_name,
+                            phone=user_info.get("phone"),
+                            is_admin=False,
+                        )
+                    )
+
+            access_token = self._jwt_service.encode_access_token(
+                payload={"sub": str(db_user.id)},
+            )
+            refresh_token = self._jwt_service.encode_refresh_token({"sub": str(db_user.id)})
+
+            return {
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "token_type": "bearer",
+                "user": {
+                    "id": db_user.id,
+                    "email": db_user.email,
+                }
+            }
+        except BadRequestException:
+            raise
+        except Exception as e:
+            raise BadRequestException(f"Google authentication failed: {str(e)}")
