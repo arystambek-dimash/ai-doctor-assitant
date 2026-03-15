@@ -1,6 +1,10 @@
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List
 
 import jwt
+
+ACCESS_TOKEN_EXPIRE_MINUTES = 15
+REFRESH_TOKEN_EXPIRE_DAYS = 30
 
 
 class JWTService:
@@ -23,10 +27,16 @@ class JWTService:
         return jwt.decode(token, key=key, algorithms=algorithms, **kwargs)
 
     def encode_access_token(self, payload: dict) -> str:
-        return jwt.encode(payload, key=self._jwt_access_secret_key, algorithm="HS256")
+        to_encode = payload.copy()
+        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        to_encode.update({"exp": expire, "iat": datetime.now(timezone.utc)})
+        return jwt.encode(to_encode, key=self._jwt_access_secret_key, algorithm="HS256")
 
     def encode_refresh_token(self, payload: dict) -> str:
-        return jwt.encode(payload, key=self._jwt_refresh_secret_key, algorithm="HS256")
+        to_encode = payload.copy()
+        expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+        to_encode.update({"exp": expire, "iat": datetime.now(timezone.utc)})
+        return jwt.encode(to_encode, key=self._jwt_refresh_secret_key, algorithm="HS256")
 
     def decode_access_token(self, token: str) -> Dict[str, Any]:
         return self._decode_jwt(

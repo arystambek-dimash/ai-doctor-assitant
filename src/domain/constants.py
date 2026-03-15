@@ -9,9 +9,9 @@ class UserRole(StrEnum):
 
 
 class DoctorStatus(str, Enum):
-    PENDING = "pending"  # Awaiting admin approval
-    APPROVED = "approved"  # Active doctor
-    REJECTED = "rejected"  # Admin rejected
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
     SUSPENDED = "suspended"
 
 
@@ -22,3 +22,42 @@ class AppointmentStatus(str, Enum):
     COMPLETED = "completed"
     CANCELLED = "cancelled"
     NO_SHOW = "no_show"
+
+
+class VisitType(str, Enum):
+    ONLINE = "online"
+    OFFLINE = "offline"
+
+
+class ChatSessionStatus(str, Enum):
+    ACTIVE = "active"
+    CLOSED = "closed"
+
+
+class ChatSource(str, Enum):
+    WEB = "web"
+    MOBILE = "mobile"
+    ADMIN = "admin"
+
+
+class MessageRole(str, Enum):
+    USER = "user"
+    ASSISTANT = "assistant"
+    SYSTEM = "system"
+
+
+class ContentType(str, Enum):
+    TEXT = "text"
+    JSON = "json"
+    EVENT = "event"
+
+
+class TriageStatus(str, Enum):
+    SUCCESS = "success"
+    FAILED = "failed"
+
+
+class UrgencyLevel(str, Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
